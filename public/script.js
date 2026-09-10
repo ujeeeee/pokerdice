@@ -272,7 +272,6 @@ function renderOnlineGame() {
     const current = currentRoom.players[currentRoom.currentPlayerIndex];
 
     renderPlayersBarOnline();
-
     const timeLeft = currentRoom.timeLeft || 60;
     document.getElementById('timerFill').style.width = (timeLeft / 60 * 100) + '%';
     document.getElementById('timerText').textContent = timeLeft;
@@ -521,7 +520,6 @@ socket.on('tick', ({ timeLeft }) => {
     if (currentRoom) {
         currentRoom.timeLeft = timeLeft;
         document.getElementById('timerFill').style.width = (timeLeft / 60 * 100) + '%';
-        document.getElementById('timerText').textContent = timeLeft;
     }
 });
 
@@ -1248,6 +1246,5 @@ setInterval(() => {
     if (!localMode && currentRoom && currentRoom.started && currentRoom.timeLeft > 0) {
         currentRoom.timeLeft--;
         document.getElementById('timerFill').style.width = (currentRoom.timeLeft / 60 * 100) + '%';
-        document.getElementById('timerText').textContent = currentRoom.timeLeft;
     }
 }, 1000);
