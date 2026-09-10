@@ -273,13 +273,13 @@ function renderOnlineGame() {
 
     renderPlayersBarOnline();
 
-    const timeLeft = currentRoom.timeLeft || 30;
-    document.getElementById('timerFill').style.width = (timeLeft / 30 * 100) + '%';
+    const timeLeft = currentRoom.timeLeft || 60;
+    document.getElementById('timerFill').style.width = (timeLeft / 60 * 100) + '%';
     document.getElementById('timerText').textContent = timeLeft;
 
     const isMyTurn = current.telegramId === myTelegramId;
     document.getElementById('playerNameDisplay').textContent =
-        `🎲 Ходит: ${current.name}${isMyTurn ? ' (ты)' : ''}`;
+        `Ходит: ${current.name}${isMyTurn ? ' (ты)' : ''}`;
 
     document.getElementById('turnNum').textContent = current.turn;
     document.getElementById('rollNum').textContent = current.rollCount;
@@ -520,7 +520,7 @@ socket.on('turnChanged', ({ room }) => {
 socket.on('tick', ({ timeLeft }) => {
     if (currentRoom) {
         currentRoom.timeLeft = timeLeft;
-        document.getElementById('timerFill').style.width = (timeLeft / 30 * 100) + '%';
+        document.getElementById('timerFill').style.width = (timeLeft / 60 * 100) + '%';
         document.getElementById('timerText').textContent = timeLeft;
     }
 });
@@ -539,23 +539,58 @@ socket.on('gameEnded', ({ room }) => {
 // ===== РЕЗУЛЬТАТЫ =====
 // ==========================================
 function showResults(room) {
+    // Сортируем игроков по очкам (для порядка столбцов)
     const sorted = room.players.map((p, idx) => ({
         ...p,
         total: getTotalForPlayer(p),
     })).sort((a, b) => b.total - a.total);
 
-    const medals = ['🥇', '🥈', '🥉'];
-    let html = '';
+    // Строим полную таблицу
+    let html = `<div style="overflow-x:auto;"><table class="scoreboard-table"><thead><tr><th>Комбинация</th>`;
     sorted.forEach((p, idx) => {
-        const medal = idx < 3 ? medals[idx] : `${idx + 1}.`;
-        html += `
-            <div class="result-item ${idx === 0 ? 'winner' : ''}">
-                <span class="place">${medal}</span>
-                <span class="name">${p.name}</span>
-                <span class="score">${p.total}</span>
-            </div>
-        `;
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+        html += `<th>${medal} ${p.name}</th>`;
     });
+    html += `</tr></thead><tbody>`;
+
+    // Основная часть
+    MAIN_LABELS.forEach(label => {
+        html += `<tr><td>${label}</td>`;
+        sorted.forEach(p => {
+            const val = p.scores[label];
+            html += `<td>${val !== null ? val : '—'}</td>`;
+        });
+        html += `</tr>`;
+    });
+
+    // Сумма 1-6
+    html += `<tr><td>📊 Сумма</td>`;
+    sorted.forEach(p => {
+        let main = 0;
+        MAIN_LABELS.forEach(l => { if (p.scores[l] !== null) main += p.scores[l]; });
+        if (main < 0) main *= 10;
+        html += `<td>${main}</td>`;
+    });
+    html += `</tr>`;
+
+    // Комбинации
+    COMBO_LABELS.forEach(label => {
+        html += `<tr><td>${label}</td>`;
+        sorted.forEach(p => {
+            const val = p.scores[label];
+            html += `<td>${val !== null ? val : '—'}</td>`;
+        });
+        html += `</tr>`;
+    });
+
+    // ИТОГО
+    html += `<tr class="total-row"><td>🏆 ИТОГО</td>`;
+    sorted.forEach(p => {
+        html += `<td>${p.total}</td>`;
+    });
+    html += `</tr>`;
+
+    html += `</tbody></table></div>`;
 
     document.getElementById('resultsContent').innerHTML = html;
     document.getElementById('resultsModal').classList.add('open');
@@ -908,7 +943,7 @@ function renderLocalGame() {
     });
     bar.innerHTML = barHtml;
 
-    document.getElementById('playerNameDisplay').textContent = `🎲 Ходит: ${current.name}`;
+    document.getElementById('playerNameDisplay').textContent = `Ходит: ${current.name}`;
 
     document.getElementById('turnNum').textContent = current.turn;
     document.getElementById('rollNum').textContent = current.rollCount;
@@ -994,18 +1029,47 @@ function showLocalResults() {
         total: getTotalForPlayer(p),
     })).sort((a, b) => b.total - a.total);
 
-    const medals = ['🥇', '🥈', '🥉'];
-    let html = '';
+    let html = `<div style="overflow-x:auto;"><table class="scoreboard-table"><thead><tr><th>Комбинация</th>`;
     sorted.forEach((p, idx) => {
-        const medal = idx < 3 ? medals[idx] : `${idx + 1}.`;
-        html += `
-            <div class="result-item ${idx === 0 ? 'winner' : ''}">
-                <span class="place">${medal}</span>
-                <span class="name">${p.name}</span>
-                <span class="score">${p.total}</span>
-            </div>
-        `;
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+        html += `<th>${medal} ${p.name}</th>`;
     });
+    html += `</tr></thead><tbody>`;
+
+    MAIN_LABELS.forEach(label => {
+        html += `<tr><td>${label}</td>`;
+        sorted.forEach(p => {
+            const val = p.scores[label];
+            html += `<td>${val !== null ? val : '—'}</td>`;
+        });
+        html += `</tr>`;
+    });
+
+    html += `<tr><td>📊 Сумма</td>`;
+    sorted.forEach(p => {
+        let main = 0;
+        MAIN_LABELS.forEach(l => { if (p.scores[l] !== null) main += p.scores[l]; });
+        if (main < 0) main *= 10;
+        html += `<td>${main}</td>`;
+    });
+    html += `</tr>`;
+
+    COMBO_LABELS.forEach(label => {
+        html += `<tr><td>${label}</td>`;
+        sorted.forEach(p => {
+            const val = p.scores[label];
+            html += `<td>${val !== null ? val : '—'}</td>`;
+        });
+        html += `</tr>`;
+    });
+
+    html += `<tr class="total-row"><td>🏆 ИТОГО</td>`;
+    sorted.forEach(p => {
+        html += `<td>${p.total}</td>`;
+    });
+    html += `</tr>`;
+
+    html += `</tbody></table></div>`;
 
     document.getElementById('resultsContent').innerHTML = html;
     document.getElementById('resultsModal').classList.add('open');
@@ -1183,7 +1247,7 @@ window.addEventListener('load', () => {
 setInterval(() => {
     if (!localMode && currentRoom && currentRoom.started && currentRoom.timeLeft > 0) {
         currentRoom.timeLeft--;
-        document.getElementById('timerFill').style.width = (currentRoom.timeLeft / 30 * 100) + '%';
+        document.getElementById('timerFill').style.width = (currentRoom.timeLeft / 60 * 100) + '%';
         document.getElementById('timerText').textContent = currentRoom.timeLeft;
     }
 }, 1000);

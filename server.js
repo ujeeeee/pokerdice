@@ -27,7 +27,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ==========================================
 const MAIN_LABELS = ['1', '2', '3', '4', '5', '6'];
 const COMBO_LABELS = ['Пара', '2 пары', 'Сет', '3+2', 'Каре', 'Малый стрит', 'Большой стрит', 'Чёт', 'Нечет', 'Покер'];
-const TURN_TIME = 30;
+const TURN_TIME = 60;
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 10;
 
