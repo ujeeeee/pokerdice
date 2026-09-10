@@ -28,6 +28,7 @@ const socket = io();
 
 let currentRoom = null;
 let myTelegramId = tgUser.id;
+let animationInProgress = false;
 
 // ==========================================
 // ===== ЛОКАЛЬНЫЙ РЕЖИМ =====
@@ -71,6 +72,41 @@ function getLocalCurrent() {
 function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
+}
+
+// ==========================================
+// ===== АНИМАЦИЯ КУБИКОВ =====
+// ==========================================
+function animateDice(finalDice, selected, callback, containerId = 'diceContainer') {
+    animationInProgress = true;
+    const container = document.getElementById(containerId);
+    let count = 0;
+    const maxCount = 12;
+
+    const interval = setInterval(() => {
+        let html = '';
+        for (let i = 0; i < 5; i++) {
+            // Если кубик выбран — не крутим, показываем финал
+            const val = selected[i] ? finalDice[i] : Math.floor(Math.random() * 6) + 1;
+            const sel = selected[i] ? 'selected' : '';
+            html += `<div class="die ${sel} rolling">${renderDieValue(val)}</div>`;
+        }
+        container.innerHTML = html;
+        count++;
+
+        if (count >= maxCount) {
+            clearInterval(interval);
+            // Финальный кадр
+            let finalHtml = '';
+            for (let i = 0; i < 5; i++) {
+                const sel = selected[i] ? 'selected' : '';
+                finalHtml += `<div class="die ${sel}">${renderDieValue(finalDice[i])}</div>`;
+            }
+            container.innerHTML = finalHtml;
+            animationInProgress = false;
+            if (callback) callback();
+        }
+    }, 50);
 }
 
 // ==========================================
@@ -175,6 +211,7 @@ function startOnlineGame() {
 function rollDiceOnline() {
     if (localMode) return rollDiceLocal();
 
+    if (animationInProgress) return;
     if (!currentRoom || !currentRoom.started) return;
     const current = currentRoom.players[currentRoom.currentPlayerIndex];
     if (current.telegramId !== myTelegramId) return;
@@ -191,6 +228,7 @@ function rollDiceOnline() {
 // ==========================================
 function onDieClickOnline(index) {
     if (localMode) return onDieClickLocal(index);
+    if (animationInProgress) return;
 
     if (!currentRoom || !currentRoom.started) return;
     const current = currentRoom.players[currentRoom.currentPlayerIndex];
@@ -212,6 +250,7 @@ function onDieClickOnline(index) {
 // ==========================================
 function onRowClickOnline(label) {
     if (localMode) return onRowClickLocal(label);
+    if (animationInProgress) return;
 
     if (!currentRoom || !currentRoom.started) return;
     const current = currentRoom.players[currentRoom.currentPlayerIndex];
@@ -248,10 +287,17 @@ function renderOnlineGame() {
     document.getElementById('rollNum').textContent = current.rollCount;
 
     renderTableForPlayer(current);
-    renderDiceForPlayer(current, isMyTurn);
+
+    // Кубики рисуем только если НЕ в процессе анимации
+    if (!animationInProgress) {
+        renderDiceForPlayer(current, isMyTurn);
+    }
 
     const btn = document.getElementById('rollBtn');
-    if (!isMyTurn) {
+    if (animationInProgress) {
+        btn.disabled = true;
+        btn.textContent = '🌀🌀🌀';
+    } else if (!isMyTurn) {
         btn.disabled = true;
         btn.textContent = `👁️ ${current.name} ходит...`;
     } else if (current.rollCount === 3) {
@@ -440,23 +486,29 @@ socket.on('gameStarted', ({ room }) => {
 });
 
 socket.on('diceRolled', ({ room }) => {
+    const oldRoom = currentRoom;
     currentRoom = room;
-    renderOnlineGame();
+    const current = currentRoom.players[currentRoom.currentPlayerIndex];
+
+    // Запускаем анимацию
+    animateDice(current.dice, current.selected, () => {
+        renderOnlineGame();
+    });
 });
 
 socket.on('diceSelected', ({ room }) => {
     currentRoom = room;
-    renderOnlineGame();
+    if (!animationInProgress) renderOnlineGame();
 });
 
 socket.on('cellClosed', ({ room }) => {
     currentRoom = room;
-    renderOnlineGame();
+    if (!animationInProgress) renderOnlineGame();
 });
 
 socket.on('turnChanged', ({ room }) => {
     currentRoom = room;
-    renderOnlineGame();
+    if (!animationInProgress) renderOnlineGame();
 });
 
 socket.on('tick', ({ timeLeft }) => {
@@ -469,7 +521,7 @@ socket.on('tick', ({ timeLeft }) => {
 
 socket.on('autoTurnDone', ({ room }) => {
     currentRoom = room;
-    renderOnlineGame();
+    if (!animationInProgress) renderOnlineGame();
 });
 
 socket.on('gameEnded', ({ room }) => {
@@ -735,18 +787,25 @@ function startLocalMultiplayer() {
 
 function rollDiceLocal() {
     if (!localGame || localGame.finished) return;
+    if (animationInProgress) return;
     const current = getLocalCurrent();
     if (!current) return;
     if (current.rollCount >= 3) return;
 
+    // Генерируем финальные кубики
+    let newDice;
     if (current.dice.length === 0) {
-        current.dice = Array.from({ length: 5 }, () => Math.floor(Math.random() * 6) + 1);
+        newDice = Array.from({ length: 5 }, () => Math.floor(Math.random() * 6) + 1);
     } else {
-        current.dice = current.dice.map((v, i) =>
+        newDice = current.dice.map((v, i) =>
             current.selected[i] ? v : Math.floor(Math.random() * 6) + 1
         );
     }
 
+    const oldSelected = [...current.selected];
+
+    // Обновляем состояние сразу, чтобы кнопки блокировались
+    current.dice = newDice;
     current.rollCount++;
     current.selected = [false, false, false, false, false];
     current.available = getAvailableCombosLocal(current.dice, current.scores);
@@ -755,11 +814,15 @@ function rollDiceLocal() {
         current.available = getAllEmptyLocal(current.scores);
     }
 
-    renderLocalGame();
+    // Запускаем анимацию, потом обновляем UI
+    animateDice(newDice, oldSelected, () => {
+        renderLocalGame();
+    });
 }
 
 function onDieClickLocal(index) {
     if (!localGame || localGame.finished) return;
+    if (animationInProgress) return;
     const current = getLocalCurrent();
     if (!current) return;
     if (current.rollCount === 0 || current.rollCount === 3) return;
@@ -770,6 +833,7 @@ function onDieClickLocal(index) {
 
 function onRowClickLocal(label) {
     if (!localGame || localGame.finished) return;
+    if (animationInProgress) return;
     const current = getLocalCurrent();
     if (!current) return;
     if (current.scores[label] !== null) return;
@@ -847,10 +911,17 @@ function renderLocalGame() {
     document.getElementById('rollNum').textContent = current.rollCount;
 
     renderTableForPlayer(current);
-    renderDiceForPlayer(current, true);
+
+    // Кубики только если не идёт анимация
+    if (!animationInProgress) {
+        renderDiceForPlayer(current, true);
+    }
 
     const btn = document.getElementById('rollBtn');
-    if (current.finished) {
+    if (animationInProgress) {
+        btn.disabled = true;
+        btn.textContent = '🌀🌀🌀';
+    } else if (current.finished) {
         btn.disabled = true;
         btn.textContent = '🏁 Игрок закончил';
     } else if (current.rollCount === 3) {
