@@ -27,19 +27,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ==========================================
 const MAIN_LABELS = ['1', '2', '3', '4', '5', '6'];
 const COMBO_LABELS = ['Пара', '2 пары', 'Сет', '3+2', 'Каре', 'Малый стрит', 'Большой стрит', 'Чёт', 'Нечет', 'Покер'];
-const TURN_TIME = 30;       // секунд на ход
-const MIN_PLAYERS = 2;      // минимум игроков для старта
-const MAX_PLAYERS = 10;     // максимум
+const TURN_TIME = 30;
+const MIN_PLAYERS = 2;
+const MAX_PLAYERS = 10;
 
-// Хранилище комнат в памяти
-// { roomCode: { code, players: [], currentPlayerIndex, started, timer, ... } }
 const rooms = {};
 
 // ==========================================
 // ===== УТИЛИТЫ =====
 // ==========================================
 function generateRoomCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // без похожих символов
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
         code += chars[Math.floor(Math.random() * chars.length)];
@@ -59,7 +57,7 @@ function rollFive() {
 }
 
 // ==========================================
-// ===== ЛОГИКА ИГРЫ (портировано с клиента) =====
+// ===== ЛОГИКА ИГРЫ =====
 // ==========================================
 function checkCombos(dice) {
     const result = {};
@@ -230,7 +228,6 @@ function getAllEmpty(scores) {
 // ==========================================
 async function saveGameResults(players, roomCode) {
     try {
-        // Сортируем по очкам (для определения места)
         const ranked = players.map((p, idx) => ({
             ...p,
             index: idx,
@@ -243,7 +240,6 @@ async function saveGameResults(players, roomCode) {
             const total = p.total;
             const mainSum = getMainSum(p.scores);
 
-            // 1. Обновляем агрегаты в players
             const { data: existing } = await supabase
                 .from('players')
                 .select('*')
@@ -279,7 +275,6 @@ async function saveGameResults(players, roomCode) {
                     });
             }
 
-            // 2. Записываем игру в games
             const opponents = players
                 .filter(op => op.telegramId !== p.telegramId)
                 .map(op => String(op.telegramId));
@@ -375,11 +370,16 @@ io.on('connection', (socket) => {
         });
 
         socket.join(code);
+
+        // Отправляем новому игроку — чтобы он перешёл в лобби
+        socket.emit('joinedRoom', { room: sanitizeRoom(room) });
+
+        // Всем остальным — обновление списка
         io.to(code).emit('roomUpdated', { room: sanitizeRoom(room) });
         console.log(`👤 ${name} подключился к ${code}`);
     });
 
-    // ----- СТАРТ ИГРЫ (только создатель) -----
+    // ----- СТАРТ ИГРЫ -----
     socket.on('startGame', ({ code, telegramId }) => {
         const room = rooms[code];
         if (!room) return;
@@ -409,7 +409,6 @@ io.on('connection', (socket) => {
         if (current.telegramId !== telegramId) return;
         if (current.rollCount >= 3) return;
 
-        // Бросаем кубики (кроме выбранных)
         current.dice = current.dice.length === 0
             ? rollFive()
             : current.dice.map((v, i) => current.selected[i] ? v : Math.floor(Math.random() * 6) + 1);
@@ -425,7 +424,7 @@ io.on('connection', (socket) => {
         io.to(code).emit('diceRolled', { room: sanitizeRoom(room) });
     });
 
-    // ----- ВЫБОР КУБИКОВ ДЛЯ ПЕРЕБРОСА -----
+    // ----- ВЫБОР КУБИКОВ -----
     socket.on('selectDice', ({ code, telegramId, selected }) => {
         const room = rooms[code];
         if (!room || !room.started) return;
@@ -452,13 +451,11 @@ io.on('connection', (socket) => {
         current.scores[label] = val;
         current.turn++;
 
-        // Сброс
         current.rollCount = 0;
         current.dice = [];
         current.selected = [false, false, false, false, false];
         current.available = [];
 
-        // Проверка конца игры
         const allClosed = MAIN_LABELS.every(l => current.scores[l] !== null) &&
                           COMBO_LABELS.every(l => current.scores[l] !== null);
         if (allClosed || current.turn > 16) {
@@ -467,7 +464,6 @@ io.on('connection', (socket) => {
 
         io.to(code).emit('cellClosed', { room: sanitizeRoom(room) });
 
-        // Переход хода
         clearTurnTimer(code);
         nextTurn(code);
     });
@@ -479,17 +475,42 @@ io.on('connection', (socket) => {
             const room = rooms[code];
             const idx = room.players.findIndex(p => p.socketId === socket.id);
             if (idx !== -1) {
-                // Если игра не началась — удаляем
+                const leavingPlayer = room.players[idx];
+
+                // Если игра НЕ началась — удаляем игрока из лобби
                 if (!room.started) {
                     room.players.splice(idx, 1);
+
+                    // Если комната опустела — удаляем
                     if (room.players.length === 0) {
                         delete rooms[code];
-                        console.log(`🗑️ Комната ${code} удалена`);
-                    } else {
-                        io.to(code).emit('roomUpdated', { room: sanitizeRoom(room) });
+                        console.log(`🗑️ Комната ${code} удалена (все вышли)`);
+                        break;
                     }
+
+                    // Если остался 1 игрок — комната закрывается
+                    if (room.players.length === 1) {
+                        io.to(code).emit('roomClosed', {
+                            message: '❌ Все игроки вышли. Комната закрыта.'
+                        });
+                        delete rooms[code];
+                        console.log(`🗑️ Комната ${code} удалена (остался 1 игрок)`);
+                        break;
+                    }
+
+                    // Если вышел создатель — передаём права следующему
+                    if (room.hostId === leavingPlayer.telegramId) {
+                        room.hostId = room.players[0].telegramId;
+                        console.log(`👑 В комнате ${code} новый создатель: ${room.players[0].name}`);
+                    }
+
+                    io.to(code).emit('roomUpdated', { room: sanitizeRoom(room) });
+                    console.log(`👤 ${leavingPlayer.name} покинул комнату ${code}`);
                 }
-                // Если игра идёт — оставляем (таймер продолжает идти)
+                // Если игра ИДЁТ — оставляем (таймер продолжает идти)
+                else {
+                    console.log(`⚠️ ${leavingPlayer.name} отключился во время игры ${code}`);
+                }
                 break;
             }
         }
@@ -497,10 +518,9 @@ io.on('connection', (socket) => {
 });
 
 // ==========================================
-// ===== УПРАВЛЕНИЕ ХОДАМИ И ТАЙМЕРОМ =====
+// ===== УПРАВЛЕНИЕ ХОДАМИ =====
 // ==========================================
 function sanitizeRoom(room) {
-    // Не отправляем socketId клиентам (безопасность)
     return {
         code: room.code,
         hostId: room.hostId,
@@ -525,7 +545,6 @@ function nextTurn(code) {
     const room = rooms[code];
     if (!room) return;
 
-    // Ищем следующего незаконченного
     let nextIndex = room.currentPlayerIndex;
     let found = false;
     for (let i = 1; i <= room.players.length; i++) {
@@ -538,7 +557,6 @@ function nextTurn(code) {
     }
 
     if (!found) {
-        // Игра закончена
         endGame(code);
         return;
     }
@@ -580,7 +598,6 @@ function autoTurn(code) {
 
     const current = room.players[room.currentPlayerIndex];
 
-    // Если игрок не бросал — бросаем 1 раз
     if (current.rollCount === 0) {
         current.dice = rollFive();
         current.rollCount = 1;
@@ -590,7 +607,6 @@ function autoTurn(code) {
         }
     }
 
-    // Закрываем случайную доступную ячейку
     const available = current.available.length > 0
         ? current.available
         : getAllEmpty(current.scores);
@@ -603,13 +619,11 @@ function autoTurn(code) {
         current.turn++;
     }
 
-    // Сброс
     current.rollCount = 0;
     current.dice = [];
     current.selected = [false, false, false, false, false];
     current.available = [];
 
-    // Проверка конца
     const allClosed = MAIN_LABELS.every(l => current.scores[l] !== null) &&
                       COMBO_LABELS.every(l => current.scores[l] !== null);
     if (allClosed || current.turn > 16) {
@@ -618,7 +632,6 @@ function autoTurn(code) {
 
     io.to(code).emit('autoTurnDone', { room: sanitizeRoom(room) });
 
-    // Следующий
     setTimeout(() => nextTurn(code), 500);
 }
 
@@ -628,10 +641,8 @@ async function endGame(code) {
 
     io.to(code).emit('gameEnded', { room: sanitizeRoom(room) });
 
-    // Сохраняем результаты в Supabase
     await saveGameResults(room.players, code);
 
-    // Чистим комнату через 5 минут
     setTimeout(() => {
         delete rooms[code];
         console.log(`🗑️ Комната ${code} удалена после игры`);
@@ -662,7 +673,6 @@ app.get('/api/stats/:telegramId', async (req, res) => {
             .order('played_at', { ascending: false })
             .limit(50);
 
-        // Средний коэффициент (Bayesian)
         const { data: globalStats } = await supabase
             .from('players')
             .select('total_score, games_played');
@@ -711,7 +721,6 @@ app.get('/api/leaderboard', async (req, res) => {
 
         if (error) throw error;
 
-        // Для коэффициента считаем на лету
         const { data: globalStats } = await supabase
             .from('players')
             .select('total_score, games_played');

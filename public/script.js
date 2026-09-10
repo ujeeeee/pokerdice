@@ -86,7 +86,6 @@ function animateDice(finalDice, selected, callback, containerId = 'diceContainer
     const interval = setInterval(() => {
         let html = '';
         for (let i = 0; i < 5; i++) {
-            // Если кубик выбран — не крутим, показываем финал
             const val = selected[i] ? finalDice[i] : Math.floor(Math.random() * 6) + 1;
             const sel = selected[i] ? 'selected' : '';
             html += `<div class="die ${sel} rolling">${renderDieValue(val)}</div>`;
@@ -96,7 +95,6 @@ function animateDice(finalDice, selected, callback, containerId = 'diceContainer
 
         if (count >= maxCount) {
             clearInterval(interval);
-            // Финальный кадр
             let finalHtml = '';
             for (let i = 0; i < 5; i++) {
                 const sel = selected[i] ? 'selected' : '';
@@ -288,7 +286,6 @@ function renderOnlineGame() {
 
     renderTableForPlayer(current);
 
-    // Кубики рисуем только если НЕ в процессе анимации
     if (!animationInProgress) {
         renderDiceForPlayer(current, isMyTurn);
     }
@@ -470,9 +467,20 @@ socket.on('roomCreated', ({ code, room }) => {
     renderLobby();
 });
 
+socket.on('joinedRoom', ({ room }) => {
+    currentRoom = room;
+    showScreen('screenLobby');
+    renderLobby();
+});
+
 socket.on('roomUpdated', ({ room }) => {
     currentRoom = room;
     renderLobby();
+});
+
+socket.on('roomClosed', ({ message }) => {
+    alert(message);
+    location.reload();
 });
 
 socket.on('error', ({ message }) => {
@@ -486,11 +494,9 @@ socket.on('gameStarted', ({ room }) => {
 });
 
 socket.on('diceRolled', ({ room }) => {
-    const oldRoom = currentRoom;
     currentRoom = room;
     const current = currentRoom.players[currentRoom.currentPlayerIndex];
 
-    // Запускаем анимацию
     animateDice(current.dice, current.selected, () => {
         renderOnlineGame();
     });
@@ -792,7 +798,6 @@ function rollDiceLocal() {
     if (!current) return;
     if (current.rollCount >= 3) return;
 
-    // Генерируем финальные кубики
     let newDice;
     if (current.dice.length === 0) {
         newDice = Array.from({ length: 5 }, () => Math.floor(Math.random() * 6) + 1);
@@ -804,7 +809,6 @@ function rollDiceLocal() {
 
     const oldSelected = [...current.selected];
 
-    // Обновляем состояние сразу, чтобы кнопки блокировались
     current.dice = newDice;
     current.rollCount++;
     current.selected = [false, false, false, false, false];
@@ -814,7 +818,6 @@ function rollDiceLocal() {
         current.available = getAllEmptyLocal(current.scores);
     }
 
-    // Запускаем анимацию, потом обновляем UI
     animateDice(newDice, oldSelected, () => {
         renderLocalGame();
     });
@@ -912,7 +915,6 @@ function renderLocalGame() {
 
     renderTableForPlayer(current);
 
-    // Кубики только если не идёт анимация
     if (!animationInProgress) {
         renderDiceForPlayer(current, true);
     }
