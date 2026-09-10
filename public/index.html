@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>PokerDice</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <!-- ========================================== -->
+    <!-- ЭКРАН 1: ГЛАВНОЕ МЕНЮ -->
+    <!-- ========================================== -->
+    <div id="screenMenu" class="screen active">
+        <div class="menu-header">
+            <h1>🎲 PokerDice</h1>
+            <p class="welcome">Добро пожаловать, <b id="userName">Игрок</b>!</p>
+        </div>
+
+        <div class="menu-buttons">
+            <button class="menu-btn primary" onclick="showScreen('screenCreate')">
+                🎮 Создать комнату
+            </button>
+            <button class="menu-btn" onclick="showScreen('screenJoin')">
+                🔗 Подключиться к комнате
+            </button>
+            <button class="menu-btn" onclick="startLocalGame()">
+                👥 Играть на одном устройстве
+            </button>
+            <button class="menu-btn" onclick="showStats()">
+                📊 Моя статистика
+            </button>
+            <button class="menu-btn" onclick="showLeaderboard()">
+                🏆 Рейтинг игроков
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ЭКРАН 2: СОЗДАНИЕ КОМНАТЫ -->
+    <!-- ========================================== -->
+    <div id="screenCreate" class="screen">
+        <div class="screen-header">
+            <button class="back-btn" onclick="showScreen('screenMenu')">←</button>
+            <h2>Создать комнату</h2>
+        </div>
+        <div class="screen-content">
+            <p class="hint">Ты станешь создателем комнаты. Сможешь начать игру, когда подключатся друзья.</p>
+            <button class="menu-btn primary" onclick="createRoom()">
+                🎮 Создать
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ЭКРАН 3: ПОДКЛЮЧЕНИЕ К КОМНАТЕ -->
+    <!-- ========================================== -->
+    <div id="screenJoin" class="screen">
+        <div class="screen-header">
+            <button class="back-btn" onclick="showScreen('screenMenu')">←</button>
+            <h2>Подключиться</h2>
+        </div>
+        <div class="screen-content">
+            <p class="hint">Введи 6-символьный код комнаты:</p>
+            <input type="text" id="joinCodeInput" class="code-input" placeholder="ABC123" maxlength="6" />
+            <button class="menu-btn primary" onclick="joinRoom()">
+                🔗 Подключиться
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ЭКРАН 4: ЛОББИ -->
+    <!-- ========================================== -->
+    <div id="screenLobby" class="screen">
+        <div class="screen-header">
+            <button class="back-btn" onclick="leaveRoom()">←</button>
+            <h2>🎮 Лобби</h2>
+        </div>
+        <div class="screen-content">
+            <div class="room-code-box">
+                <p class="hint">Код комнаты:</p>
+                <div class="room-code" id="lobbyCode">------</div>
+                <div class="lobby-actions">
+                    <button class="small-btn" onclick="copyCode()">📋 Копировать</button>
+                    <button class="small-btn" onclick="shareLink()">🔗 Пригласить</button>
+                </div>
+            </div>
+
+            <div class="players-section">
+                <p class="hint">Игроки (<span id="playersCount">1</span>/10):</p>
+                <div id="lobbyPlayers" class="lobby-players"></div>
+            </div>
+
+            <button id="startGameBtn" class="menu-btn primary hidden" onclick="startOnlineGame()">
+                🚀 Начать игру
+            </button>
+            <p id="waitingHostText" class="hint hidden">⏳ Ждём, пока создатель начнёт игру...</p>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ЭКРАН 5: ИГРА -->
+    <!-- ========================================== -->
+    <div id="screenGame" class="screen">
+        <div class="header">
+            <h1>🎲 PokerDice</h1>
+            <div class="header-buttons">
+                <button class="reset-btn" onclick="leaveRoom()">🚪</button>
+                <button class="scoreboard-btn" onclick="toggleOnlineScoreboard()">📊</button>
+                <button class="help-btn" onclick="showHelp()">❓</button>
+            </div>
+        </div>
+
+        <!-- Список игроков -->
+        <div class="players-bar" id="playersBar"></div>
+
+        <!-- Таймер -->
+        <div class="timer-bar">
+            <div class="timer-fill" id="timerFill"></div>
+            <span class="timer-text" id="timerText">30</span>
+        </div>
+
+        <!-- Имя текущего игрока -->
+        <div class="player-name" id="playerNameDisplay">🎲 Игрок</div>
+
+        <!-- Инфо -->
+        <div class="info-bar">
+            <span>Ход: <b id="turnNum">1</b>/16</span>
+            <span>Бросок: <b id="rollNum">0</b>/3</span>
+            <span>🎯 Счёт: <b id="totalScore">0</b></span>
+        </div>
+
+        <!-- Таблица -->
+        <div class="table-wrap" id="tableWrap"></div>
+
+        <!-- Кубики -->
+        <div class="dice-area">
+            <div class="dice-container" id="diceContainer"></div>
+        </div>
+
+        <!-- Кнопка броска -->
+        <div class="btn-area">
+            <button class="btn-roll" id="rollBtn" onclick="rollDiceOnline()">🎲🎲🎲</button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ЭКРАН 6: СТАТИСТИКА -->
+    <!-- ========================================== -->
+    <div id="screenStats" class="screen">
+        <div class="screen-header">
+            <button class="back-btn" onclick="showScreen('screenMenu')">←</button>
+            <h2>📊 Моя статистика</h2>
+        </div>
+        <div class="screen-content" id="statsContent">
+            <p class="hint">Загрузка...</p>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ЭКРАН 7: РЕЙТИНГ -->
+    <!-- ========================================== -->
+    <div id="screenLeaderboard" class="screen">
+        <div class="screen-header">
+            <button class="back-btn" onclick="showScreen('screenMenu')">←</button>
+            <h2>🏆 Рейтинг</h2>
+        </div>
+        <div class="sort-tabs">
+            <button class="sort-tab active" onclick="switchLeaderboard('score', this)">🎯 По счёту</button>
+            <button class="sort-tab" onclick="switchLeaderboard('coefficient', this)">🧮 По коэф.</button>
+        </div>
+        <div class="screen-content" id="leaderboardContent">
+            <p class="hint">Загрузка...</p>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- МОДАЛКА: РЕЗУЛЬТАТЫ ИГРЫ -->
+    <!-- ========================================== -->
+    <div class="modal-overlay" id="resultsModal">
+        <div class="modal">
+            <h2>🏆 Результаты игры</h2>
+            <div id="resultsContent"></div>
+            <button class="close-btn" onclick="closeResultsAndExit()">🔄 В меню</button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- МОДАЛКА: ТАБЛИЦА ИГРОКОВ -->
+    <!-- ========================================== -->
+    <div class="modal-overlay" id="scoreboardModal">
+        <div class="modal scoreboard-modal">
+            <h2>📊 Все игроки</h2>
+            <div id="scoreboardContent"></div>
+            <button class="close-btn" onclick="closeScoreboard()">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- МОДАЛКА: ПРАВИЛА -->
+    <!-- ========================================== -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal">
+            <h2>📖 Правила</h2>
+            <p><b>Цель:</b> За 16 ходов закрыть все 16 комбинаций. Каждый ход — 3 броска.</p>
+            <p><b>Основная часть (1-6):</b></p>
+            <table>
+                <tr><td>3 кости</td><td>0</td></tr>
+                <tr><td>4 кости</td><td>+номинал</td></tr>
+                <tr><td>5 костей</td><td>+номинал×2</td></tr>
+                <tr><td>2 кости</td><td>-номинал</td></tr>
+                <tr><td>1 кость</td><td>-номинал×2</td></tr>
+                <tr><td>0 костей</td><td>-номинал×3</td></tr>
+            </table>
+            <p><b>Комбинации:</b></p>
+            <table>
+                <tr><td>Пара</td><td>сумма двух костей</td></tr>
+                <tr><td>2 пары</td><td>сумма всех 4-х</td></tr>
+                <tr><td>Сет</td><td>сумма трёх</td></tr>
+                <tr><td>3+2</td><td>сумма всех 5-ти</td></tr>
+                <tr><td>Каре</td><td>сумма четырёх</td></tr>
+                <tr><td>Малый стрит (1-5)</td><td>15</td></tr>
+                <tr><td>Большой стрит (2-6)</td><td>20</td></tr>
+                <tr><td>Чёт</td><td>сумма всех</td></tr>
+                <tr><td>Нечет</td><td>сумма всех</td></tr>
+                <tr><td>Покер</td><td>50 + сумма всех</td></tr>
+            </table>
+            <p><b>Бросок с руки:</b> если комбинация (кроме основной) выпала с первого броска — очки удваиваются, ход заканчивается.</p>
+            <button class="close-btn" onclick="closeHelp()">Закрыть</button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- МОДАЛКА: ЛОКАЛЬНАЯ ИГРА (настройка) -->
+    <!-- ========================================== -->
+    <div class="modal-overlay" id="localSetupModal">
+        <div class="modal">
+            <h2>👥 Локальная игра</h2>
+            <p class="hint" style="text-align:center;margin-bottom:16px;">Выбери количество игроков и введи имена</p>
+            <div class="setup-players-count">
+                <label>Количество:</label>
+                <div class="players-count-buttons">
+                    <button class="count-btn active" data-count="2" onclick="setLocalCount(2)">2</button>
+                    <button class="count-btn" data-count="3" onclick="setLocalCount(3)">3</button>
+                    <button class="count-btn" data-count="4" onclick="setLocalCount(4)">4</button>
+                    <button class="count-btn" data-count="5" onclick="setLocalCount(5)">5</button>
+                </div>
+            </div>
+            <div id="localNamesContainer"></div>
+            <button class="btn-start" onclick="startLocalMultiplayer()">🚀 Начать</button>
+            <button class="close-btn" style="background:#2a2a4a;" onclick="closeLocalSetup()">Отмена</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

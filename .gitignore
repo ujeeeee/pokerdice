@@ -1,0 +1,6 @@
+node_modules/
+.env
+keys.txt
+keys_backup.txt
+*.log
+.DS_Store
