@@ -26,10 +26,44 @@ document.getElementById('userName').textContent = tgUser.name;
 // ==========================================
 const socket = io();
 
-let currentRoom = null;         // данные комнаты с сервера
+let currentRoom = null;
 let myTelegramId = tgUser.id;
-let localMode = false;          // true = локальная игра (не онлайн)
-let localGame = null;           // состояние локальной игры
+
+// ==========================================
+// ===== ЛОКАЛЬНЫЙ РЕЖИМ =====
+// ==========================================
+let localMode = false;
+let localGame = null;
+
+function emptyScoresLocal() {
+    const s = {};
+    MAIN_LABELS.forEach(l => s[l] = null);
+    COMBO_LABELS.forEach(l => s[l] = null);
+    return s;
+}
+
+function createLocalGame(names) {
+    return {
+        players: names.map(name => ({
+            name,
+            scores: emptyScoresLocal(),
+            turn: 1,
+            finished: false,
+            dice: [],
+            selected: [false, false, false, false, false],
+            rollCount: 0,
+            available: [],
+        })),
+        currentPlayerIndex: 0,
+        started: true,
+        finished: false,
+    };
+}
+
+function getLocalCurrent() {
+    if (!localGame) return null;
+    return localGame.players[localGame.currentPlayerIndex];
+}
 
 // ==========================================
 // ===== УПРАВЛЕНИЕ ЭКРАНАМИ =====
@@ -89,7 +123,6 @@ function renderLobby() {
     });
     container.innerHTML = html;
 
-    // Кнопка "Начать" только у создателя
     const startBtn = document.getElementById('startGameBtn');
     const waitText = document.getElementById('waitingHostText');
 
@@ -120,7 +153,7 @@ function shareLink() {
 }
 
 function leaveRoom() {
-    if (confirm('Выйти из комнаты?')) {
+    if (confirm('Выйти?')) {
         location.reload();
     }
 }
@@ -137,9 +170,11 @@ function startOnlineGame() {
 }
 
 // ==========================================
-// ===== БРОСОК КУБИКОВ (онлайн) =====
+// ===== БРОСОК КУБИКОВ =====
 // ==========================================
 function rollDiceOnline() {
+    if (localMode) return rollDiceLocal();
+
     if (!currentRoom || !currentRoom.started) return;
     const current = currentRoom.players[currentRoom.currentPlayerIndex];
     if (current.telegramId !== myTelegramId) return;
@@ -152,9 +187,11 @@ function rollDiceOnline() {
 }
 
 // ==========================================
-// ===== КЛИК ПО КУБИКУ (онлайн) =====
+// ===== КЛИК ПО КУБИКУ =====
 // ==========================================
 function onDieClickOnline(index) {
+    if (localMode) return onDieClickLocal(index);
+
     if (!currentRoom || !currentRoom.started) return;
     const current = currentRoom.players[currentRoom.currentPlayerIndex];
     if (current.telegramId !== myTelegramId) return;
@@ -171,9 +208,11 @@ function onDieClickOnline(index) {
 }
 
 // ==========================================
-// ===== КЛИК ПО ЯЧЕЙКЕ (онлайн) =====
+// ===== КЛИК ПО ЯЧЕЙКЕ =====
 // ==========================================
 function onRowClickOnline(label) {
+    if (localMode) return onRowClickLocal(label);
+
     if (!currentRoom || !currentRoom.started) return;
     const current = currentRoom.players[currentRoom.currentPlayerIndex];
     if (current.telegramId !== myTelegramId) return;
@@ -195,30 +234,22 @@ function renderOnlineGame() {
 
     const current = currentRoom.players[currentRoom.currentPlayerIndex];
 
-    // Список игроков сверху
-    renderPlayersBar();
+    renderPlayersBarOnline();
 
-    // Таймер
     const timeLeft = currentRoom.timeLeft || 30;
     document.getElementById('timerFill').style.width = (timeLeft / 30 * 100) + '%';
     document.getElementById('timerText').textContent = timeLeft;
 
-    // Имя текущего игрока
     const isMyTurn = current.telegramId === myTelegramId;
     document.getElementById('playerNameDisplay').textContent =
         `🎲 Ходит: ${current.name}${isMyTurn ? ' (ты)' : ''}`;
 
-    // Инфо
     document.getElementById('turnNum').textContent = current.turn;
     document.getElementById('rollNum').textContent = current.rollCount;
 
-    // Таблица (показываем игрока, который ходит)
     renderTableForPlayer(current);
-
-    // Кубики
     renderDiceForPlayer(current, isMyTurn);
 
-    // Кнопка броска
     const btn = document.getElementById('rollBtn');
     if (!isMyTurn) {
         btn.disabled = true;
@@ -235,7 +266,7 @@ function renderOnlineGame() {
     }
 }
 
-function renderPlayersBar() {
+function renderPlayersBarOnline() {
     const bar = document.getElementById('playersBar');
     let html = '';
     currentRoom.players.forEach((p, idx) => {
@@ -477,9 +508,10 @@ function closeResultsAndExit() {
 }
 
 // ==========================================
-// ===== ТАБЛИЦА ИГРОКОВ (промежуточная) =====
+// ===== ТАБЛИЦА ИГРОКОВ =====
 // ==========================================
 function toggleOnlineScoreboard() {
+    if (localMode) return toggleLocalScoreboard();
     if (!currentRoom) return;
     renderScoreboardOnline();
     document.getElementById('scoreboardModal').classList.add('open');
@@ -561,7 +593,7 @@ async function showStats() {
             container.innerHTML = `
                 <p class="hint" style="text-align:center;padding:40px 20px;">
                     🎮 У тебя пока нет сыгранных онлайн-игр.<br><br>
-                    Создай комнату или подключись к друзьям, чтобы начать!
+                    Создай комнату или подключись к друзьям!
                 </p>
             `;
             return;
@@ -570,30 +602,12 @@ async function showStats() {
         const p = data.player;
 
         let html = `
-            <div class="stat-row">
-                <span class="stat-label">🎮 Всего игр</span>
-                <span class="stat-value">${p.games_played}</span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-label">🏆 Побед</span>
-                <span class="stat-value">${p.wins} (${p.win_rate}%)</span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-label">🎯 Лучший счёт</span>
-                <span class="stat-value highlight">${p.best_score}</span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-label">📉 Худший счёт</span>
-                <span class="stat-value">${p.worst_score}</span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-label">📊 Средний счёт</span>
-                <span class="stat-value">${p.avg_score}</span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-label">🧮 Коэффициент</span>
-                <span class="stat-value highlight">${p.coefficient}</span>
-            </div>
+            <div class="stat-row"><span class="stat-label">🎮 Всего игр</span><span class="stat-value">${p.games_played}</span></div>
+            <div class="stat-row"><span class="stat-label">🏆 Побед</span><span class="stat-value">${p.wins} (${p.win_rate}%)</span></div>
+            <div class="stat-row"><span class="stat-label">🎯 Лучший счёт</span><span class="stat-value highlight">${p.best_score}</span></div>
+            <div class="stat-row"><span class="stat-label">📉 Худший счёт</span><span class="stat-value">${p.worst_score}</span></div>
+            <div class="stat-row"><span class="stat-label">📊 Средний счёт</span><span class="stat-value">${p.avg_score}</span></div>
+            <div class="stat-row"><span class="stat-label">🧮 Коэффициент</span><span class="stat-value highlight">${p.coefficient}</span></div>
         `;
 
         if (data.games && data.games.length > 0) {
@@ -602,13 +616,7 @@ async function showStats() {
                 const date = new Date(g.played_at).toLocaleDateString('ru-RU');
                 const medals = ['🥇', '🥈', '🥉'];
                 const medal = g.place <= 3 ? medals[g.place - 1] : `${g.place}.`;
-                html += `
-                    <div class="history-item">
-                        <span class="date">${date}</span>
-                        <span class="score">${g.score}</span>
-                        <span class="place">${medal}</span>
-                    </div>
-                `;
+                html += `<div class="history-item"><span class="date">${date}</span><span class="score">${g.score}</span><span class="place">${medal}</span></div>`;
             });
             html += `</div>`;
         }
@@ -655,14 +663,7 @@ async function loadLeaderboard(sort) {
             const medals = ['🥇', '🥈', '🥉'];
             const rank = idx < 3 ? medals[idx] : `${idx + 1}.`;
             const value = sort === 'score' ? p.best_score : p.coefficient;
-
-            html += `
-                <div class="leaderboard-item ${isMe ? 'me' : ''}">
-                    <span class="rank">${rank}</span>
-                    <span class="name">${p.name}${isMe ? ' (ты)' : ''}</span>
-                    <span class="score">${value}</span>
-                </div>
-            `;
+            html += `<div class="leaderboard-item ${isMe ? 'me' : ''}"><span class="rank">${rank}</span><span class="name">${p.name}${isMe ? ' (ты)' : ''}</span><span class="score">${value}</span></div>`;
         });
 
         container.innerHTML = html;
@@ -672,8 +673,10 @@ async function loadLeaderboard(sort) {
 }
 
 // ==========================================
-// ===== ЛОКАЛЬНАЯ ИГРА (упрощённая версия) =====
+// ===== ЛОКАЛЬНАЯ ИГРА =====
 // ==========================================
+let localCount = 2;
+
 function startLocalGame() {
     document.getElementById('localSetupModal').classList.add('open');
     renderLocalInputs();
@@ -682,8 +685,6 @@ function startLocalGame() {
 function closeLocalSetup() {
     document.getElementById('localSetupModal').classList.remove('open');
 }
-
-let localCount = 2;
 
 function setLocalCount(count) {
     localCount = count;
@@ -697,10 +698,11 @@ function renderLocalInputs() {
     const container = document.getElementById('localNamesContainer');
     let html = '';
     for (let i = 1; i <= localCount; i++) {
+        const defaultName = localCount === 1 ? tgUser.name : `Игрок ${i}`;
         html += `
             <div class="player-name-input">
                 <label>${i}.</label>
-                <input type="text" id="localName${i}" placeholder="Игрок ${i}" value="Игрок ${i}" maxlength="15" />
+                <input type="text" id="localName${i}" placeholder="${defaultName}" value="${defaultName}" maxlength="15" />
             </div>
         `;
     }
@@ -708,16 +710,280 @@ function renderLocalInputs() {
 }
 
 function startLocalMultiplayer() {
-    // Временная заглушка — можно расширить локальный режим позже
-    alert('Локальный режим в разработке. Пока используй онлайн!');
+    const names = [];
+    for (let i = 1; i <= localCount; i++) {
+        const input = document.getElementById(`localName${i}`);
+        names.push(input.value.trim() || `Игрок ${i}`);
+    }
+
+    const unique = new Set(names);
+    if (unique.size !== names.length) {
+        alert('❌ Имена не должны повторяться!');
+        return;
+    }
+
+    localGame = createLocalGame(names);
+    localMode = true;
+
     closeLocalSetup();
+    showScreen('screenGame');
+
+    document.querySelector('.timer-bar').style.display = 'none';
+
+    renderLocalGame();
+}
+
+function rollDiceLocal() {
+    if (!localGame || localGame.finished) return;
+    const current = getLocalCurrent();
+    if (!current) return;
+    if (current.rollCount >= 3) return;
+
+    if (current.dice.length === 0) {
+        current.dice = Array.from({ length: 5 }, () => Math.floor(Math.random() * 6) + 1);
+    } else {
+        current.dice = current.dice.map((v, i) =>
+            current.selected[i] ? v : Math.floor(Math.random() * 6) + 1
+        );
+    }
+
+    current.rollCount++;
+    current.selected = [false, false, false, false, false];
+    current.available = getAvailableCombosLocal(current.dice, current.scores);
+
+    if (current.rollCount === 3 && current.available.length === 0) {
+        current.available = getAllEmptyLocal(current.scores);
+    }
+
+    renderLocalGame();
+}
+
+function onDieClickLocal(index) {
+    if (!localGame || localGame.finished) return;
+    const current = getLocalCurrent();
+    if (!current) return;
+    if (current.rollCount === 0 || current.rollCount === 3) return;
+
+    current.selected[index] = !current.selected[index];
+    renderLocalGame();
+}
+
+function onRowClickLocal(label) {
+    if (!localGame || localGame.finished) return;
+    const current = getLocalCurrent();
+    if (!current) return;
+    if (current.scores[label] !== null) return;
+    if (current.rollCount === 0) return;
+
+    const isFromHand = (current.rollCount === 1);
+    const val = calculateScoreForPlayer(label, current.dice, isFromHand);
+    current.scores[label] = val;
+    current.turn++;
+
+    current.rollCount = 0;
+    current.dice = [];
+    current.selected = [false, false, false, false, false];
+    current.available = [];
+
+    const allClosed = MAIN_LABELS.every(l => current.scores[l] !== null) &&
+        COMBO_LABELS.every(l => current.scores[l] !== null);
+    if (allClosed || current.turn > 16) {
+        current.finished = true;
+    }
+
+    nextLocalTurn();
+}
+
+function nextLocalTurn() {
+    if (!localGame) return;
+
+    let nextIndex = localGame.currentPlayerIndex;
+    let found = false;
+    for (let i = 1; i <= localGame.players.length; i++) {
+        const idx = (localGame.currentPlayerIndex + i) % localGame.players.length;
+        if (!localGame.players[idx].finished) {
+            nextIndex = idx;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        localGame.finished = true;
+        renderLocalGame();
+        setTimeout(() => showLocalResults(), 300);
+        return;
+    }
+
+    localGame.currentPlayerIndex = nextIndex;
+    renderLocalGame();
+}
+
+function renderLocalGame() {
+    if (!localGame) return;
+
+    const current = getLocalCurrent();
+    if (!current) return;
+
+    const bar = document.getElementById('playersBar');
+    let barHtml = '';
+    localGame.players.forEach((p, idx) => {
+        const isActive = idx === localGame.currentPlayerIndex;
+        const isFinished = p.finished;
+        const total = getTotalForPlayer(p);
+        barHtml += `
+            <div class="player-chip ${isActive ? 'active' : ''} ${isFinished ? 'finished' : ''}">
+                <div class="chip-avatar">${p.name[0].toUpperCase()}</div>
+                <span>${p.name}</span>
+                <b>${total}</b>
+            </div>
+        `;
+    });
+    bar.innerHTML = barHtml;
+
+    document.getElementById('playerNameDisplay').textContent = `🎲 Ходит: ${current.name}`;
+
+    document.getElementById('turnNum').textContent = current.turn;
+    document.getElementById('rollNum').textContent = current.rollCount;
+
+    renderTableForPlayer(current);
+    renderDiceForPlayer(current, true);
+
+    const btn = document.getElementById('rollBtn');
+    if (current.finished) {
+        btn.disabled = true;
+        btn.textContent = '🏁 Игрок закончил';
+    } else if (current.rollCount === 3) {
+        btn.disabled = true;
+        btn.textContent = '⛔ Выбери комбинацию';
+    } else if (current.rollCount === 0) {
+        btn.disabled = false;
+        btn.textContent = '🎲🎲🎲 Крутить';
+    } else {
+        btn.disabled = false;
+        btn.textContent = '🔄🔄🔄 Перебросить';
+    }
+}
+
+function toggleLocalScoreboard() {
+    if (!localGame) return;
+
+    let html = `<table class="scoreboard-table"><thead><tr><th>Комбинация</th>`;
+    localGame.players.forEach(p => { html += `<th>${p.name}</th>`; });
+    html += `</tr></thead><tbody>`;
+
+    MAIN_LABELS.forEach(label => {
+        html += `<tr><td>${label}</td>`;
+        localGame.players.forEach((p, idx) => {
+            const val = p.scores[label];
+            const isCur = idx === localGame.currentPlayerIndex;
+            html += `<td${isCur ? ' class="current-player"' : ''}>${val !== null ? val : '—'}</td>`;
+        });
+        html += `</tr>`;
+    });
+
+    html += `<tr><td>📊 Сумма</td>`;
+    localGame.players.forEach((p, idx) => {
+        let main = 0;
+        MAIN_LABELS.forEach(l => { if (p.scores[l] !== null) main += p.scores[l]; });
+        if (main < 0) main *= 10;
+        const isCur = idx === localGame.currentPlayerIndex;
+        html += `<td${isCur ? ' class="current-player"' : ''}>${main}</td>`;
+    });
+    html += `</tr>`;
+
+    COMBO_LABELS.forEach(label => {
+        html += `<tr><td>${label}</td>`;
+        localGame.players.forEach((p, idx) => {
+            const val = p.scores[label];
+            const isCur = idx === localGame.currentPlayerIndex;
+            html += `<td${isCur ? ' class="current-player"' : ''}>${val !== null ? val : '—'}</td>`;
+        });
+        html += `</tr>`;
+    });
+
+    html += `<tr class="total-row"><td>🏆 ИТОГО</td>`;
+    localGame.players.forEach((p, idx) => {
+        const isCur = idx === localGame.currentPlayerIndex;
+        html += `<td${isCur ? ' class="current-player"' : ''}>${getTotalForPlayer(p)}</td>`;
+    });
+    html += `</tr></tbody></table>`;
+
+    document.getElementById('scoreboardContent').innerHTML = html;
+    document.getElementById('scoreboardModal').classList.add('open');
+}
+
+function showLocalResults() {
+    if (!localGame) return;
+
+    const sorted = localGame.players.map(p => ({
+        ...p,
+        total: getTotalForPlayer(p),
+    })).sort((a, b) => b.total - a.total);
+
+    const medals = ['🥇', '🥈', '🥉'];
+    let html = '';
+    sorted.forEach((p, idx) => {
+        const medal = idx < 3 ? medals[idx] : `${idx + 1}.`;
+        html += `
+            <div class="result-item ${idx === 0 ? 'winner' : ''}">
+                <span class="place">${medal}</span>
+                <span class="name">${p.name}</span>
+                <span class="score">${p.total}</span>
+            </div>
+        `;
+    });
+
+    document.getElementById('resultsContent').innerHTML = html;
+    document.getElementById('resultsModal').classList.add('open');
+}
+
+function getAvailableCombosLocal(dice, scores) {
+    const available = [];
+    MAIN_LABELS.forEach(label => {
+        if (scores[label] !== null) return;
+        const num = parseInt(label);
+        const count = dice.filter(d => d === num).length;
+        if (count >= 3) available.push(label);
+    });
+    const combos = checkCombosLocal(dice);
+    COMBO_LABELS.forEach(label => {
+        if (scores[label] !== null) return;
+        if (combos[label]) available.push(label);
+    });
+    return available;
+}
+
+function getAllEmptyLocal(scores) {
+    const empty = [];
+    MAIN_LABELS.forEach(l => { if (scores[l] === null) empty.push(l); });
+    COMBO_LABELS.forEach(l => { if (scores[l] === null) empty.push(l); });
+    return empty;
+}
+
+function checkCombosLocal(dice) {
+    const result = {};
+    const sorted = dice.slice().sort();
+    const freq = {};
+    sorted.forEach(d => { freq[d] = (freq[d] || 0) + 1; });
+    const counts = Object.values(freq);
+    if (counts.some(c => c >= 2)) result['Пара'] = true;
+    if (counts.filter(c => c >= 2).length >= 2) result['2 пары'] = true;
+    if (counts.some(c => c >= 3)) result['Сет'] = true;
+    if (counts.some(c => c === 3) && counts.some(c => c === 2)) result['3+2'] = true;
+    if (counts.some(c => c >= 4)) result['Каре'] = true;
+    if (sorted.join(',') === [1,2,3,4,5].join(',')) result['Малый стрит'] = true;
+    if (sorted.join(',') === [2,3,4,5,6].join(',')) result['Большой стрит'] = true;
+    if (dice.every(d => d % 2 === 0)) result['Чёт'] = true;
+    if (dice.every(d => d % 2 === 1)) result['Нечет'] = true;
+    if (counts.some(c => c === 5)) result['Покер'] = true;
+    return result;
 }
 
 // ==========================================
 // ===== ВСПОМОГАТЕЛЬНЫЕ =====
 // ==========================================
 function calculateScoreForPlayer(label, dice, isFromHand) {
-    // Упрощённая копия серверной логики для отображения предпросмотра
     if (MAIN_LABELS.includes(label)) {
         const num = parseInt(label);
         const count = dice.filter(d => d === num).length;
@@ -820,10 +1086,9 @@ function calculateScoreForPlayer(label, dice, isFromHand) {
 }
 
 // ==========================================
-// ===== ПРОВЕРКА URL-ПАРАМЕТРА (приглашение) =====
+// ===== URL-ПАРАМЕТР =====
 // ==========================================
 window.addEventListener('load', () => {
-    // Проверяем startapp параметр из Telegram
     let roomCode = null;
     try {
         const tg = window.Telegram.WebApp;
@@ -833,7 +1098,6 @@ window.addEventListener('load', () => {
     } catch (e) {}
 
     if (roomCode && roomCode.length === 6) {
-        // Автоматически подключаемся к комнате
         setTimeout(() => {
             showScreen('screenJoin');
             document.getElementById('joinCodeInput').value = roomCode;
@@ -842,9 +1106,9 @@ window.addEventListener('load', () => {
     }
 });
 
-// Автообновление таймера
+// Автообновление таймера (только онлайн)
 setInterval(() => {
-    if (currentRoom && currentRoom.started && currentRoom.timeLeft > 0) {
+    if (!localMode && currentRoom && currentRoom.started && currentRoom.timeLeft > 0) {
         currentRoom.timeLeft--;
         document.getElementById('timerFill').style.width = (currentRoom.timeLeft / 30 * 100) + '%';
         document.getElementById('timerText').textContent = currentRoom.timeLeft;

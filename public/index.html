@@ -113,34 +113,27 @@
             </div>
         </div>
 
-        <!-- Список игроков -->
         <div class="players-bar" id="playersBar"></div>
 
-        <!-- Таймер -->
         <div class="timer-bar">
             <div class="timer-fill" id="timerFill"></div>
             <span class="timer-text" id="timerText">30</span>
         </div>
 
-        <!-- Имя текущего игрока -->
         <div class="player-name" id="playerNameDisplay">🎲 Игрок</div>
 
-        <!-- Инфо -->
         <div class="info-bar">
             <span>Ход: <b id="turnNum">1</b>/16</span>
             <span>Бросок: <b id="rollNum">0</b>/3</span>
             <span>🎯 Счёт: <b id="totalScore">0</b></span>
         </div>
 
-        <!-- Таблица -->
         <div class="table-wrap" id="tableWrap"></div>
 
-        <!-- Кубики -->
         <div class="dice-area">
             <div class="dice-container" id="diceContainer"></div>
         </div>
 
-        <!-- Кнопка броска -->
         <div class="btn-area">
             <button class="btn-roll" id="rollBtn" onclick="rollDiceOnline()">🎲🎲🎲</button>
         </div>
@@ -238,14 +231,20 @@
     <div class="modal-overlay" id="localSetupModal">
         <div class="modal">
             <h2>👥 Локальная игра</h2>
-            <p class="hint" style="text-align:center;margin-bottom:16px;">Выбери количество игроков и введи имена</p>
+            <p class="hint" style="text-align:center;margin-bottom:16px;">Выбери количество игроков (1-10) и введи имена</p>
             <div class="setup-players-count">
                 <label>Количество:</label>
                 <div class="players-count-buttons">
+                    <button class="count-btn" data-count="1" onclick="setLocalCount(1)">1</button>
                     <button class="count-btn active" data-count="2" onclick="setLocalCount(2)">2</button>
                     <button class="count-btn" data-count="3" onclick="setLocalCount(3)">3</button>
                     <button class="count-btn" data-count="4" onclick="setLocalCount(4)">4</button>
                     <button class="count-btn" data-count="5" onclick="setLocalCount(5)">5</button>
+                    <button class="count-btn" data-count="6" onclick="setLocalCount(6)">6</button>
+                    <button class="count-btn" data-count="7" onclick="setLocalCount(7)">7</button>
+                    <button class="count-btn" data-count="8" onclick="setLocalCount(8)">8</button>
+                    <button class="count-btn" data-count="9" onclick="setLocalCount(9)">9</button>
+                    <button class="count-btn" data-count="10" onclick="setLocalCount(10)">10</button>
                 </div>
             </div>
             <div id="localNamesContainer"></div>
