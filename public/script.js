@@ -545,6 +545,10 @@ socket.on('gameEnded', ({ room }) => {
     showResults(room);
 });
 
+socket.on('stickerSent', ({ emoji, name }) => {
+    showFloatingEmoji(emoji, name);
+});
+
 // ==========================================
 // ===== РЕЗУЛЬТАТЫ =====
 // ==========================================
@@ -678,6 +682,53 @@ function showHelp() {
 
 function closeHelp() {
     document.getElementById('helpModal').classList.remove('open');
+}
+
+// ==========================================
+// ===== СТИКЕРЫ =====
+// ==========================================
+function toggleStickers() {
+    document.getElementById('stickersPanel').classList.toggle('open');
+}
+
+function closeStickers() {
+    document.getElementById('stickersPanel').classList.remove('open');
+}
+
+function sendSticker(emoji) {
+    if (!currentRoom && !localMode) return;
+    
+    if (localMode) {
+        // В локальном режиме — просто показываем
+        const current = getLocalCurrent();
+        showFloatingEmoji(emoji, current ? current.name : 'Игрок');
+        closeStickers();
+        return;
+    }
+    
+    socket.emit('sendSticker', {
+        code: currentRoom.code,
+        telegramId: myTelegramId,
+        emoji
+    });
+    
+    closeStickers();
+}
+
+function showFloatingEmoji(emoji, name) {
+    const container = document.getElementById('floatingEmojis');
+    const el = document.createElement('div');
+    el.className = 'floating-emoji';
+    el.innerHTML = `
+        <div class="floating-emoji-icon">${emoji}</div>
+        <div class="floating-emoji-name">${name}</div>
+    `;
+    container.appendChild(el);
+    
+    // Удаляем через 3 секунды
+    setTimeout(() => {
+        el.remove();
+    }, 3000);
 }
 
 // ==========================================

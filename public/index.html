@@ -121,7 +121,14 @@
         <div class="btn-area">
             <button class="btn-roll" id="rollBtn" onclick="rollDiceOnline()">🎲🎲🎲</button>
         </div>
+
+        <div class="btn-area">
+            <button class="btn-stickers" onclick="toggleStickers()">😀 Стикеры</button>
+        </div>
     </div>
+
+    <!-- КОНТЕЙНЕР ДЛЯ ВСПЛЫВАЮЩИХ ЭМОДЗИ -->
+    <div class="floating-emojis" id="floatingEmojis"></div>
 
     <!-- ========================================== -->
     <!-- ЭКРАН 6: СТАТИСТИКА -->
@@ -301,6 +308,42 @@
             <div id="localNamesContainer"></div>
             <button class="btn-start" onclick="startLocalMultiplayer()">🚀 Начать</button>
             <button class="close-btn" style="background:#2a2a4a;" onclick="closeLocalSetup()">Отмена</button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ПАНЕЛЬ СТИКЕРОВ -->
+    <!-- ========================================== -->
+    <div class="stickers-panel" id="stickersPanel">
+        <div class="stickers-header">
+            <span>😀 Стикеры</span>
+            <button class="stickers-close" onclick="closeStickers()">✕</button>
+        </div>
+        <div class="stickers-grid">
+            <button onclick="sendSticker('😀')">😀</button>
+            <button onclick="sendSticker('😂')">😂</button>
+            <button onclick="sendSticker('😍')">😍</button>
+            <button onclick="sendSticker('🤔')">🤔</button>
+            <button onclick="sendSticker('😎')">😎</button>
+            <button onclick="sendSticker('😭')">😭</button>
+            <button onclick="sendSticker('😡')">😡</button>
+            <button onclick="sendSticker('🥳')">🥳</button>
+            <button onclick="sendSticker('🤯')">🤯</button>
+            <button onclick="sendSticker('😴')">😴</button>
+            <button onclick="sendSticker('👍')">👍</button>
+            <button onclick="sendSticker('👎')">👎</button>
+            <button onclick="sendSticker('👏')">👏</button>
+            <button onclick="sendSticker('🙏')">🙏</button>
+            <button onclick="sendSticker('🔥')">🔥</button>
+            <button onclick="sendSticker('💯')">💯</button>
+            <button onclick="sendSticker('❤️')">❤️</button>
+            <button onclick="sendSticker('💔')">💔</button>
+            <button onclick="sendSticker('🎲')">🎲</button>
+            <button onclick="sendSticker('🏆')">🏆</button>
+            <button onclick="sendSticker('💀')">💀</button>
+            <button onclick="sendSticker('🤡')">🤡</button>
+            <button onclick="sendSticker('🍀')">🍀</button>
+            <button onclick="sendSticker('🤝')">🤝</button>
         </div>
     </div>
 

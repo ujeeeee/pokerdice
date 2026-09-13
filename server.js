@@ -468,6 +468,23 @@ io.on('connection', (socket) => {
         nextTurn(code);
     });
 
+        // ----- ОТПРАВКА СТИКЕРА -----
+    socket.on('sendSticker', ({ code, telegramId, emoji }) => {
+        const room = rooms[code];
+        if (!room) return;
+        
+        const player = room.players.find(p => p.telegramId === telegramId);
+        if (!player) return;
+        
+        io.to(code).emit('stickerSent', {
+            emoji,
+            name: player.name,
+            telegramId
+        });
+        
+        console.log(`😀 ${player.name} отправил ${emoji} в ${code}`);
+    });
+
     // ----- ОТКЛЮЧЕНИЕ -----
     socket.on('disconnect', () => {
         console.log('❌ Отключение:', socket.id);
