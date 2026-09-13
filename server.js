@@ -684,7 +684,7 @@ app.get('/api/stats/:telegramId', async (req, res) => {
             globalAvg = totalGames > 0 ? totalScore / totalGames : 0;
         }
 
-        const C = 5;
+        const C = 10;
         const coefficient = player.games_played > 0
             ? (player.total_score + C * globalAvg) / (player.games_played + C)
             : 0;
