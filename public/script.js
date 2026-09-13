@@ -549,6 +549,27 @@ socket.on('stickerSent', ({ emoji, name }) => {
     showFloatingEmoji(emoji, name);
 });
 
+socket.on('messageSent', ({ text, name }) => {
+    showFloatingMessage(text, name);
+});
+
+    // ----- ОТПРАВКА БЫСТРОГО СООБЩЕНИЯ -----
+    socket.on('sendMessage', ({ code, telegramId, text }) => {
+        const room = rooms[code];
+        if (!room) return;
+        
+        const player = room.players.find(p => p.telegramId === telegramId);
+        if (!player) return;
+        
+        io.to(code).emit('messageSent', {
+            text,
+            name: player.name,
+            telegramId
+        });
+        
+        console.log(`💬 ${player.name}: ${text} (${code})`);
+    });
+
 // ==========================================
 // ===== РЕЗУЛЬТАТЫ =====
 // ==========================================
@@ -713,6 +734,40 @@ function sendSticker(emoji) {
     });
     
     closeStickers();
+}
+
+function sendMessage(text) {
+    if (!currentRoom && !localMode) return;
+    
+    if (localMode) {
+        const current = getLocalCurrent();
+        showFloatingMessage(text, current ? current.name : 'Игрок');
+        closeStickers();
+        return;
+    }
+    
+    socket.emit('sendMessage', {
+        code: currentRoom.code,
+        telegramId: myTelegramId,
+        text
+    });
+    
+    closeStickers();
+}
+
+function showFloatingMessage(text, name) {
+    const container = document.getElementById('floatingEmojis');
+    const el = document.createElement('div');
+    el.className = 'floating-emoji floating-message';
+    el.innerHTML = `
+        <div class="floating-emoji-name"><b>${name}:</b></div>
+        <div class="floating-message-text">${text}</div>
+    `;
+    container.appendChild(el);
+    
+    setTimeout(() => {
+        el.remove();
+    }, 3000);
 }
 
 function showFloatingEmoji(emoji, name) {
