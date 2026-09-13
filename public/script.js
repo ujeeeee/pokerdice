@@ -86,9 +86,14 @@ function animateDice(finalDice, selected, callback, containerId = 'diceContainer
     const interval = setInterval(() => {
         let html = '';
         for (let i = 0; i < 5; i++) {
-            const val = selected[i] ? finalDice[i] : Math.floor(Math.random() * 6) + 1;
-            const sel = selected[i] ? 'selected' : '';
-            html += `<div class="die ${sel} rolling">${renderDieValue(val)}</div>`;
+            if (selected[i]) {
+                // Выделенные — стоят на месте, без анимации
+                html += `<div class="die selected">${renderDieValue(finalDice[i])}</div>`;
+            } else {
+                // Невыделенные — крутятся
+                const val = Math.floor(Math.random() * 6) + 1;
+                html += `<div class="die rolling">${renderDieValue(val)}</div>`;
+            }
         }
         container.innerHTML = html;
         count++;
@@ -284,9 +289,13 @@ function renderOnlineGame() {
 
     renderTableForPlayer(current);
 
-    if (!animationInProgress) {
-        renderDiceForPlayer(current, isMyTurn);
+   if (!animationInProgress) {
+    // Если 3 броска — все кубики выделяются принудительно
+    if (current.rollCount === 3) {
+        current.selected = [true, true, true, true, true];
     }
+    renderDiceForPlayer(current, isMyTurn);
+}
 
     const btn = document.getElementById('rollBtn');
     if (animationInProgress) {
@@ -422,8 +431,12 @@ function renderDiceForPlayer(player, isMyTurn) {
         }
     } else {
         player.dice.forEach((val, i) => {
-            const sel = player.selected[i] ? 'selected' : '';
-            const clickable = isMyTurn ? `onclick="onDieClickOnline(${i})"` : '';
+            // Если 3 броска — все выделены
+            const isSelected = (player.rollCount === 3) ? true : player.selected[i];
+            const sel = isSelected ? 'selected' : '';
+            // Клик работает только если это мой ход и не 3-й бросок
+            const canClick = isMyTurn && player.rollCount < 3;
+            const clickable = canClick ? `onclick="onDieClickOnline(${i})"` : '';
             html += `<div class="die ${sel}" ${clickable}>${renderDieValue(val)}</div>`;
         });
     }
@@ -843,7 +856,7 @@ function rollDiceLocal() {
 
     current.dice = newDice;
     current.rollCount++;
-    current.selected = [false, false, false, false, false];
+    // НЕ сбрасываем selected — пользователь сам решит, что оставить
     current.available = getAvailableCombosLocal(current.dice, current.scores);
 
     if (current.rollCount === 3 && current.available.length === 0) {
@@ -948,6 +961,10 @@ function renderLocalGame() {
     renderTableForPlayer(current);
 
     if (!animationInProgress) {
+        // Если 3 броска — все кубики выделяются принудительно
+        if (current.rollCount === 3) {
+            current.selected = [true, true, true, true, true];
+        }
         renderDiceForPlayer(current, true);
     }
 

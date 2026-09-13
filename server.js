@@ -414,7 +414,7 @@ io.on('connection', (socket) => {
             : current.dice.map((v, i) => current.selected[i] ? v : Math.floor(Math.random() * 6) + 1);
 
         current.rollCount++;
-        current.selected = [false, false, false, false, false];
+        // НЕ сбрасываем selected — пользователь сам решит
         current.available = getAvailableCombos(current.dice, current.scores);
 
         if (current.rollCount === 3 && current.available.length === 0) {
