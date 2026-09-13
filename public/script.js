@@ -274,7 +274,6 @@ function renderOnlineGame() {
     renderPlayersBarOnline();
     const timeLeft = currentRoom.timeLeft || 60;
     document.getElementById('timerFill').style.width = (timeLeft / 60 * 100) + '%';
-    document.getElementById('timerText').textContent = timeLeft;
 
     const isMyTurn = current.telegramId === myTelegramId;
     document.getElementById('playerNameDisplay').textContent =
