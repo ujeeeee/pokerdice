@@ -465,7 +465,7 @@ io.on('connection', (socket) => {
         io.to(code).emit('cellClosed', { room: sanitizeRoom(room) });
 
         clearTurnTimer(code);
-        nextTurn(code);
+        setTimeout(() => nextTurn(code), 1000);
     });
 
         // ----- ОТПРАВКА СТИКЕРА -----

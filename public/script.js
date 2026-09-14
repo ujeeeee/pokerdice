@@ -29,6 +29,7 @@ const socket = io();
 let currentRoom = null;
 let myTelegramId = tgUser.id;
 let animationInProgress = false;
+let lastClosedLabel = null;
 
 // ==========================================
 // ===== ЛОКАЛЬНЫЙ РЕЖИМ =====
@@ -261,6 +262,8 @@ function onRowClickOnline(label) {
     if (current.scores[label] !== null) return;
     if (current.rollCount === 0) return;
 
+    lastClosedLabel = label;
+
     socket.emit('closeCell', {
         code: currentRoom.code,
         telegramId: myTelegramId,
@@ -414,7 +417,7 @@ function rowHTMLForPlayer(player, label) {
     }
 
     return `
-        <div class="${cls}" onclick="onRowClickOnline('${label}')">
+        <div class="${cls}" data-label="${label}" onclick="onRowClickOnline('${label}')">
             <span class="label">${label}</span>
             <span class="value">${displayVal}</span>
         </div>
@@ -520,7 +523,21 @@ socket.on('diceSelected', ({ room }) => {
 
 socket.on('cellClosed', ({ room }) => {
     currentRoom = room;
-    if (!animationInProgress) renderOnlineGame();
+    if (!animationInProgress) {
+        renderOnlineGame();
+        
+        // Подсвечиваем только что закрытую ячейку
+        if (lastClosedLabel) {
+            const el = document.querySelector(`.table-row-item[data-label="${lastClosedLabel}"]`);
+            if (el) {
+                el.classList.add('just-closed');
+                setTimeout(() => {
+                    el.classList.remove('just-closed');
+                }, 1000);
+            }
+            lastClosedLabel = null;
+        }
+    }
 });
 
 socket.on('turnChanged', ({ room }) => {
@@ -992,7 +1009,19 @@ function onRowClickLocal(label) {
         current.finished = true;
     }
 
-    nextLocalTurn();
+    renderLocalGame();
+
+    // Подсвечиваем закрытую ячейку
+    const el = document.querySelector(`.table-row-item[data-label="${label}"]`);
+    if (el) {
+        el.classList.add('just-closed');
+        setTimeout(() => {
+            el.classList.remove('just-closed');
+        }, 1000);
+    }
+
+    // Переключаем ход через 1 секунду
+    setTimeout(() => nextLocalTurn(), 400);
 }
 
 function nextLocalTurn() {
