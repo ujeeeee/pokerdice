@@ -485,6 +485,23 @@ io.on('connection', (socket) => {
         console.log(`😀 ${player.name} отправил ${emoji} в ${code}`);
     });
 
+        // ----- ОТПРАВКА БЫСТРОГО СООБЩЕНИЯ -----
+    socket.on('sendMessage', ({ code, telegramId, text }) => {
+        const room = rooms[code];
+        if (!room) return;
+        
+        const player = room.players.find(p => p.telegramId === telegramId);
+        if (!player) return;
+        
+        io.to(code).emit('messageSent', {
+            text,
+            name: player.name,
+            telegramId
+        });
+        
+        console.log(`💬 ${player.name}: ${text} (${code})`);
+    });
+
     // ----- ОТКЛЮЧЕНИЕ -----
     socket.on('disconnect', () => {
         console.log('❌ Отключение:', socket.id);
