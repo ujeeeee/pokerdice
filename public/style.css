@@ -1087,10 +1087,10 @@ body {
 /* ===== ВСПЛЫВАЮЩИЕ ЭМОДЗИ ===== */
 .floating-emojis {
     position: fixed;
-    bottom: 120px;
-    right: 16px;
+    top: 130px;
+    left: 12px;
     display: flex;
-    flex-direction: column-reverse;
+    flex-direction: column;
     gap: 8px;
     z-index: 150;
     pointer-events: none;
@@ -1124,7 +1124,7 @@ body {
 @keyframes floatIn {
     from {
         opacity: 0;
-        transform: translateX(30px) scale(0.5);
+        transform: translateX(-30px) scale(0.5);
     }
     to {
         opacity: 1;
