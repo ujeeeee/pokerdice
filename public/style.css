@@ -1026,7 +1026,9 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
-    background: #1a1a2e;
+    background: rgba(26, 26, 46, 0.9);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border-top: 2px solid #ff8906;
     border-radius: 20px 20px 0 0;
     padding: 12px 16px 20px;
@@ -1036,6 +1038,8 @@ body {
     max-width: 480px;
     margin: 0 auto;
     box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+    max-height: 55vh;
+    overflow-y: auto;
 }
 
 .stickers-panel.open {
@@ -1065,7 +1069,7 @@ body {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     gap: 8px;
-    max-height: 40vh;
+    max-height: 30vh;
     overflow-y: auto;
 }
 
@@ -1091,7 +1095,7 @@ body {
     left: 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;   
     z-index: 150;
     pointer-events: none;
     max-width: 200px;
@@ -1144,10 +1148,10 @@ body {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    margin-top: 12px;
-    max-height: 30vh;
+    margin-top: 10px;
+    max-height: 15vh;
     overflow-y: auto;
-    padding-top: 10px;
+    padding-top: 8px;
     border-top: 1px solid #2a2a4a;
 }
 
