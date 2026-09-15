@@ -1068,9 +1068,20 @@ body {
 .stickers-grid {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
-    gap: 8px;
-    max-height: 30vh;
+    gap: 6px;
+    max-height: 150px;
     overflow-y: auto;
+}
+
+.stickers-grid button {
+    background: #0f0e17;
+    border: 1px solid #2a2a4a;
+    border-radius: 8px;
+    font-size: 22px;
+    padding: 2px 0;
+    cursor: pointer;
+    transition: 0.15s;
+    height: 40px;
 }
 
 .stickers-grid button {
@@ -1149,7 +1160,7 @@ body {
     flex-direction: column;
     gap: 6px;
     margin-top: 10px;
-    max-height: 15vh;
+    max-height: 25vh;
     overflow-y: auto;
     padding-top: 8px;
     border-top: 1px solid #2a2a4a;
