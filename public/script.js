@@ -29,7 +29,6 @@ const socket = io();
 let currentRoom = null;
 let myTelegramId = tgUser.id;
 let animationInProgress = false;
-let lastClosedLabel = null;
 
 // ==========================================
 // ===== ЛОКАЛЬНЫЙ РЕЖИМ =====
@@ -261,8 +260,6 @@ function onRowClickOnline(label) {
     if (current.telegramId !== myTelegramId) return;
     if (current.scores[label] !== null) return;
     if (current.rollCount === 0) return;
-
-    lastClosedLabel = label;
 
     socket.emit('closeCell', {
         code: currentRoom.code,
@@ -521,21 +518,22 @@ socket.on('diceSelected', ({ room }) => {
     if (!animationInProgress) renderOnlineGame();
 });
 
-socket.on('cellClosed', ({ room }) => {
+socket.on('cellClosed', ({ room, closedLabel }) => {
     currentRoom = room;
     if (!animationInProgress) {
         renderOnlineGame();
         
-        // Подсвечиваем только что закрытую ячейку
-        if (lastClosedLabel) {
-            const el = document.querySelector(`.table-row-item[data-label="${lastClosedLabel}"]`);
-            if (el) {
-                el.classList.add('just-closed');
-                setTimeout(() => {
-                    el.classList.remove('just-closed');
-                }, 1000);
-            }
-            lastClosedLabel = null;
+        // Подсвечиваем закрытую ячейку У ВСЕХ игроков
+        if (closedLabel) {
+            setTimeout(() => {
+                const el = document.querySelector(`.table-row-item[data-label="${closedLabel}"]`);
+                if (el) {
+                    el.classList.add('just-closed');
+                    setTimeout(() => {
+                        el.classList.remove('just-closed');
+                    }, 500);
+                }
+            }, 30);
         }
     }
 });

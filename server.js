@@ -462,7 +462,10 @@ io.on('connection', (socket) => {
             current.finished = true;
         }
 
-        io.to(code).emit('cellClosed', { room: sanitizeRoom(room) });
+        io.to(code).emit('cellClosed', { 
+            room: sanitizeRoom(room),
+            closedLabel: label
+        });
 
         clearTurnTimer(code);
         setTimeout(() => nextTurn(code), 1000);
