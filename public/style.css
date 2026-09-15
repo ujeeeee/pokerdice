@@ -1038,7 +1038,7 @@ body {
     max-width: 480px;
     margin: 0 auto;
     box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
-    max-height: 55vh;
+    max-height: 85vh;
     overflow-y: auto;
 }
 
@@ -1069,7 +1069,7 @@ body {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     gap: 6px;
-    max-height: 150px;
+    max-height: 178px;
     overflow-y: auto;
 }
 
@@ -1160,10 +1160,14 @@ body {
     flex-direction: column;
     gap: 6px;
     margin-top: 10px;
-    max-height: 25vh;
+    max-height: 204px;
     overflow-y: auto;
     padding-top: 8px;
     border-top: 1px solid #2a2a4a;
+}
+
+.messages-list button {
+    min-height: 36px;
 }
 
 .messages-list button {
