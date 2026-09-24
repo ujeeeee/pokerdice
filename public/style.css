@@ -1233,3 +1233,32 @@ body {
     .info-cell { padding: 4px 8px; font-size: 12px; }
     .table-wrap { margin-top: 3px; margin-bottom: 4px; padding: 4px 6px; }
 }
+
+/* ===== КОД КОМНАТЫ В ИГРЕ ===== */
+.room-code-badge {
+    background: #2a2a4a;
+    border: 1px solid #ff8906;
+    color: #ff8906;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-family: monospace;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
+.room-code-badge:active {
+    background: #3a3a5a;
+}
+
+/* Отключённый игрок */
+.player-chip.disconnected {
+    opacity: 0.5;
+    border-color: #e94560 !important;
+}
+
+.player-chip.disconnected::after {
+    content: ' ⚠️';
+    font-size: 10px;
+}

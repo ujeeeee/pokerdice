@@ -193,6 +193,7 @@ function shareLink() {
 
 function leaveRoom() {
     if (confirm('Выйти?')) {
+        localStorage.removeItem('pokerDiceRoom');
         location.reload();
     }
 }
@@ -277,6 +278,7 @@ function renderOnlineGame() {
     const current = currentRoom.players[currentRoom.currentPlayerIndex];
 
     renderPlayersBarOnline();
+    document.getElementById('gameRoomCode').textContent = currentRoom.code;
     const timeLeft = currentRoom.timeLeft || 60;
     document.getElementById('timerFill').style.width = (timeLeft / 60 * 100) + '%';
 
@@ -322,9 +324,10 @@ function renderPlayersBarOnline() {
     currentRoom.players.forEach((p, idx) => {
         const isActive = idx === currentRoom.currentPlayerIndex;
         const isFinished = p.finished;
+        const isDisconnected = p.disconnected;
         const total = getTotalForPlayer(p);
         html += `
-            <div class="player-chip ${isActive ? 'active' : ''} ${isFinished ? 'finished' : ''}">
+            <div class="player-chip ${isActive ? 'active' : ''} ${isFinished ? 'finished' : ''} ${isDisconnected ? 'disconnected' : ''}">
                 <div class="chip-avatar">${p.name[0].toUpperCase()}</div>
                 <span>${p.name}</span>
                 <b>${total}</b>
@@ -474,12 +477,14 @@ function getDots(val) {
 // ==========================================
 socket.on('roomCreated', ({ code, room }) => {
     currentRoom = room;
+    localStorage.setItem('pokerDiceRoom', code);
     showScreen('screenLobby');
     renderLobby();
 });
 
 socket.on('joinedRoom', ({ room }) => {
     currentRoom = room;
+    localStorage.setItem('pokerDiceRoom', room.code);
     showScreen('screenLobby');
     renderLobby();
 });
@@ -1380,3 +1385,167 @@ setInterval(() => {
         document.getElementById('timerFill').style.width = (currentRoom.timeLeft / 60 * 100) + '%';
     }
 }, 1000);
+
+// ==========================================
+// ===== СМЕНА НИКА =====
+// ==========================================
+let currentNickname = null;
+
+async function loadNickname() {
+    // Сначала из localStorage
+    const saved = localStorage.getItem('pokerDiceNickname');
+    if (saved) {
+        currentNickname = saved;
+        tgUser.name = saved;
+        document.getElementById('userName').textContent = saved;
+        return;
+    }
+    
+    // Потом с сервера
+    try {
+        const res = await fetch(`/api/nickname/get/${myTelegramId}`);
+        const data = await res.json();
+        if (data.nickname) {
+            currentNickname = data.nickname;
+            tgUser.name = data.nickname;
+            document.getElementById('userName').textContent = data.nickname;
+            localStorage.setItem('pokerDiceNickname', data.nickname);
+        }
+    } catch (e) {}
+}
+
+function openNicknameModal() {
+    document.getElementById('nicknameInput').value = currentNickname || tgUser.name;
+    document.getElementById('nicknameStatus').textContent = '';
+    document.getElementById('nicknameModal').classList.add('open');
+}
+
+function closeNicknameModal() {
+    document.getElementById('nicknameModal').classList.remove('open');
+}
+
+let nicknameCheckTimer = null;
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('nicknameInput');
+    if (input) {
+        input.addEventListener('input', () => {
+            clearTimeout(nicknameCheckTimer);
+            const nickname = input.value.trim();
+            const status = document.getElementById('nicknameStatus');
+            
+            if (nickname.length < 3) {
+                status.textContent = 'Минимум 3 символа';
+                status.style.color = '#a7a9be';
+                return;
+            }
+            
+            status.textContent = 'Проверка...';
+            status.style.color = '#a7a9be';
+            
+            nicknameCheckTimer = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/nickname/check/${encodeURIComponent(nickname)}?telegramId=${myTelegramId}`);
+                    const data = await res.json();
+                    
+                    if (data.available) {
+                        status.textContent = '✅ Свободен';
+                        status.style.color = '#4ecdc4';
+                    } else {
+                        status.textContent = '❌ ' + data.reason;
+                        status.style.color = '#e94560';
+                    }
+                } catch (e) {
+                    status.textContent = '';
+                }
+            }, 400);
+        });
+    }
+});
+
+async function saveNickname() {
+    const nickname = document.getElementById('nicknameInput').value.trim();
+    const status = document.getElementById('nicknameStatus');
+    
+    if (nickname.length < 3 || nickname.length > 15) {
+        status.textContent = '❌ Ник должен быть 3-15 символов';
+        status.style.color = '#e94560';
+        return;
+    }
+    
+    status.textContent = 'Сохранение...';
+    status.style.color = '#a7a9be';
+    
+    try {
+        const res = await fetch('/api/nickname/set', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: myTelegramId, nickname })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+            status.textContent = '❌ ' + (data.error || 'Ошибка');
+            status.style.color = '#e94560';
+            return;
+        }
+        
+        currentNickname = nickname;
+        tgUser.name = nickname;
+        localStorage.setItem('pokerDiceNickname', nickname);
+        document.getElementById('userName').textContent = nickname;
+        
+        status.textContent = '✅ Сохранено!';
+        status.style.color = '#4ecdc4';
+        
+        setTimeout(() => closeNicknameModal(), 800);
+    } catch (e) {
+        status.textContent = '❌ Ошибка сети';
+        status.style.color = '#e94560';
+    }
+}
+
+// Загружаем ник при старте
+loadNickname();
+
+document.addEventListener('DOMContentLoaded', () => {
+    const codeBadge = document.getElementById('gameRoomCode');
+    if (codeBadge) {
+        codeBadge.addEventListener('click', () => {
+            if (currentRoom) {
+                navigator.clipboard.writeText(currentRoom.code);
+                codeBadge.textContent = '✅';
+                setTimeout(() => codeBadge.textContent = currentRoom.code, 1000);
+            }
+        });
+    }
+});
+
+// ==========================================
+// ===== ПЕРЕЗАХОД В КОМНАТУ =====
+// ==========================================
+socket.on('rejoinFailed', ({ message }) => {
+    localStorage.removeItem('pokerDiceRoom');
+    alert('⚠️ ' + message);
+});
+
+socket.on('gameStarted', ({ room }) => {
+    currentRoom = room;
+    localStorage.setItem('pokerDiceRoom', room.code);
+    showScreen('screenGame');
+    renderOnlineGame();
+});
+
+// При загрузке страницы — проверяем, был ли игрок в комнате
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        const savedRoom = localStorage.getItem('pokerDiceRoom');
+        if (savedRoom && savedRoom.length === 6) {
+            console.log('🔄 Попытка перезайти в комнату:', savedRoom);
+            socket.emit('rejoinRoom', {
+                code: savedRoom,
+                telegramId: myTelegramId,
+            });
+        }
+    }, 1000);
+});

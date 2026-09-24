@@ -335,6 +335,36 @@ io.on('connection', (socket) => {
         console.log(`🎮 Комната создана: ${code}`);
     });
 
+        // ----- ПЕРЕЗАХОД В КОМНАТУ -----
+    socket.on('rejoinRoom', ({ code, telegramId }) => {
+        const room = rooms[code];
+        
+        if (!room) {
+            socket.emit('rejoinFailed', { message: 'Комната больше не существует' });
+            return;
+        }
+        
+        const player = room.players.find(p => p.telegramId === telegramId);
+        if (!player) {
+            socket.emit('rejoinFailed', { message: 'Тебя нет в этой комнате' });
+            return;
+        }
+        
+        player.socketId = socket.id;
+        player.disconnected = false;
+        
+        socket.join(code);
+        
+        if (room.started) {
+            socket.emit('gameStarted', { room: sanitizeRoom(room) });
+        } else {
+            socket.emit('joinedRoom', { room: sanitizeRoom(room) });
+        }
+        
+        io.to(code).emit('roomUpdated', { room: sanitizeRoom(room) });
+        console.log(`🔄 ${player.name} вернулся в ${code}`);
+    });
+
     // ----- ПОДКЛЮЧЕНИЕ К КОМНАТЕ -----
     socket.on('joinRoom', ({ code, name, telegramId }) => {
         const room = rooms[code];
@@ -545,7 +575,10 @@ io.on('connection', (socket) => {
                     console.log(`👤 ${leavingPlayer.name} покинул комнату ${code}`);
                 }
                 // Если игра ИДЁТ — оставляем (таймер продолжает идти)
+                // Если игра ИДЁТ — помечаем как отключённого
                 else {
+                    leavingPlayer.disconnected = true;
+                    io.to(code).emit('roomUpdated', { room: sanitizeRoom(room) });
                     console.log(`⚠️ ${leavingPlayer.name} отключился во время игры ${code}`);
                 }
                 break;
@@ -574,6 +607,7 @@ function sanitizeRoom(room) {
             selected: p.selected,
             rollCount: p.rollCount,
             available: p.available,
+            disconnected: p.disconnected || false,
         })),
     };
 }
@@ -788,6 +822,87 @@ app.get('/api/leaderboard', async (req, res) => {
     } catch (err) {
         console.error('Ошибка /api/leaderboard:', err);
         res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// ==========================================
+// ===== API ДЛЯ НИКНЕЙМОВ =====
+// ==========================================
+app.use(express.json());
+
+// Проверка доступности ника
+app.get('/api/nickname/check/:nickname', async (req, res) => {
+    try {
+        const { nickname } = req.params;
+        const telegramId = req.query.telegramId;
+        
+        if (!nickname || nickname.length < 3 || nickname.length > 15) {
+            return res.json({ available: false, reason: 'Ник должен быть 3-15 символов' });
+        }
+        
+        const { data } = await supabase
+            .from('nicknames')
+            .select('telegram_id')
+            .eq('nickname', nickname)
+            .single();
+        
+        if (data && String(data.telegram_id) !== String(telegramId)) {
+            return res.json({ available: false, reason: 'Этот ник уже занят' });
+        }
+        
+        res.json({ available: true });
+    } catch (err) {
+        res.json({ available: true });
+    }
+});
+
+// Установить ник
+app.post('/api/nickname/set', async (req, res) => {
+    try {
+        const { telegramId, nickname } = req.body;
+        
+        if (!nickname || nickname.length < 3 || nickname.length > 15) {
+            return res.status(400).json({ error: 'Ник должен быть 3-15 символов' });
+        }
+        
+        const { data: existing } = await supabase
+            .from('nicknames')
+            .select('telegram_id')
+            .eq('nickname', nickname)
+            .single();
+        
+        if (existing && String(existing.telegram_id) !== String(telegramId)) {
+            return res.status(400).json({ error: 'Этот ник уже занят' });
+        }
+        
+        await supabase
+            .from('nicknames')
+            .upsert({ 
+                telegram_id: telegramId, 
+                nickname, 
+                updated_at: new Date().toISOString() 
+            });
+        
+        res.json({ success: true, nickname });
+    } catch (err) {
+        console.error('Ошибка установки ника:', err);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
+// Получить ник
+app.get('/api/nickname/get/:telegramId', async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        const { data } = await supabase
+            .from('nicknames')
+            .select('nickname')
+            .eq('telegram_id', telegramId)
+            .single();
+        
+        res.json({ nickname: data ? data.nickname : null });
+    } catch (err) {
+        res.json({ nickname: null });
     }
 });
 

@@ -15,7 +15,9 @@
     <div id="screenMenu" class="screen active">
         <div class="menu-header">
             <h1>🎲 PokerDice</h1>
-            <p class="welcome">Добро пожаловать, <b id="userName">Игрок</b>!</p>
+            <p class="welcome" onclick="openNicknameModal()" style="cursor:pointer;" title="Нажми, чтобы сменить ник">
+                Добро пожаловать, <b id="userName">Игрок</b>! ✏️
+            </p>
         </div>
 
         <div class="menu-buttons">
@@ -92,7 +94,10 @@
     <!-- ========================================== -->
     <div id="screenGame" class="screen">
         <div class="header">
-            <h1>🎲 PokerDice</h1>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <h1>🎲 PokerDice</h1>
+                <span class="room-code-badge" id="gameRoomCode" title="Код комнаты">------</span>
+            </div>
             <div class="header-buttons">
                 <button class="scoreboard-btn" onclick="toggleOnlineScoreboard()">📊</button>
                 <button class="help-btn" onclick="showHelp()">📖</button>
@@ -422,6 +427,24 @@
             <button onclick="sendMessage('Сейчас будет покер!')">Сейчас будет покер!</button>
             <button onclick="sendMessage('Че по основе?')">Че по основе?</button>
             <button onclick="sendMessage('Это пизда или нормалды? ЭТО ХУЙПАЛДЫ!')">Это пизда или нормалды? ЭТО ХУЙПАЛДЫ!</button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- МОДАЛКА: СМЕНА НИКА -->
+    <!-- ========================================== -->
+    <div class="modal-overlay" id="nicknameModal">
+        <div class="modal">
+            <h2>✏️ Сменить ник</h2>
+            <p class="hint" style="text-align:center;margin-bottom:16px;">
+                Ник должен быть уникальным, 3-15 символов
+            </p>
+            <input type="text" id="nicknameInput" class="code-input" 
+                placeholder="Новый ник" maxlength="15" 
+                style="letter-spacing:0;font-size:18px;text-transform:none;" />
+            <p id="nicknameStatus" style="text-align:center;font-size:13px;margin-top:8px;min-height:20px;"></p>
+            <button class="btn-start" onclick="saveNickname()">💾 Сохранить</button>
+            <button class="close-btn" style="background:#2a2a4a;" onclick="closeNicknameModal()">Отмена</button>
         </div>
     </div>
 
