@@ -803,7 +803,7 @@ app.get('/api/leaderboard', async (req, res) => {
             globalAvg = totalGames > 0 ? totalScore / totalGames : 0;
         }
 
-        const C = 5;
+        const C = 10;
         const enriched = players.map(p => ({
             ...p,
             avg_score: p.games_played > 0
