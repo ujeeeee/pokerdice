@@ -862,28 +862,13 @@ app.get('/api/nickname/get/:telegramId', async (req, res) => {
         const { telegramId } = req.params;
         const { data } = await supabase
             .from('nicknames')
-            .select('nickname, updated_at')
+            .select('nickname')
             .eq('telegram_id', telegramId)
             .single();
         
-        if (!data) {
-            return res.json({ nickname: null, canChange: true, nextChangeAt: null });
-        }
-        
-        // Проверяем, прошло ли 7 дней
-        const updatedAt = new Date(data.updated_at).getTime();
-        const now = Date.now();
-        const weekMs = 7 * 24 * 60 * 60 * 1000;
-        const canChange = (now - updatedAt) >= weekMs;
-        const nextChangeAt = canChange ? null : updatedAt + weekMs;
-        
-        res.json({ 
-            nickname: data.nickname, 
-            canChange, 
-            nextChangeAt 
-        });
+        res.json({ nickname: data ? data.nickname : null });
     } catch (err) {
-        res.json({ nickname: null, canChange: true, nextChangeAt: null });
+        res.json({ nickname: null });
     }
 });
 
@@ -906,21 +891,6 @@ app.post('/api/nickname/set', async (req, res) => {
         if (existingNick && existingNick.nickname === nickname) {
             return res.json({ success: true, nickname });
         }
-        
-        if (existingNick) {
-            const updatedAt = new Date(existingNick.updated_at).getTime();
-            const now = Date.now();
-            const weekMs = 1000;
-            const remaining = weekMs - (now - updatedAt);
-            
-            if (remaining > 0) {
-                const days = Math.ceil(remaining / (1000));
-                return res.status(400).json({ 
-                    error: `Ник можно менять раз в . Осталось ${days} дн.` 
-                });
-            }
-        }
-        //if (!canChangeNickname) return;
         
         // Проверяем уникальность
         const { data: busy } = await supabase
