@@ -1390,6 +1390,8 @@ setInterval(() => {
 // ===== СМЕНА НИКА =====
 // ==========================================
 let currentNickname = null;
+let canChangeNickname = true;
+let nextChangeAt = null;
 
 async function loadNickname() {
     // Сначала из localStorage
@@ -1398,25 +1400,41 @@ async function loadNickname() {
         currentNickname = saved;
         tgUser.name = saved;
         document.getElementById('userName').textContent = saved;
-        return;
     }
     
-    // Потом с сервера
+    // Потом с сервера — чтобы узнать, можно ли менять
     try {
         const res = await fetch(`/api/nickname/get/${myTelegramId}`);
         const data = await res.json();
+        
         if (data.nickname) {
             currentNickname = data.nickname;
             tgUser.name = data.nickname;
             document.getElementById('userName').textContent = data.nickname;
             localStorage.setItem('pokerDiceNickname', data.nickname);
         }
+        
+        canChangeNickname = data.canChange;
+        nextChangeAt = data.nextChangeAt;
     } catch (e) {}
 }
 
 function openNicknameModal() {
-    document.getElementById('nicknameInput').value = currentNickname || tgUser.name;
     document.getElementById('nicknameStatus').textContent = '';
+    
+    if (!canChangeNickname && nextChangeAt) {
+        const remaining = nextChangeAt - Date.now();
+        const days = Math.ceil(remaining / (24 * 60 * 60 * 1000));
+        document.getElementById('nicknameInput').value = currentNickname || tgUser.name;
+        document.getElementById('nicknameInput').disabled = true;
+        document.getElementById('nicknameStatus').innerHTML = 
+            `🔒 Ник можно менять раз в неделю.<br>Следующая смена через <b>${days} дн.</b>`;
+        document.getElementById('nicknameStatus').style.color = '#e94560';
+    } else {
+        document.getElementById('nicknameInput').value = currentNickname || tgUser.name;
+        document.getElementById('nicknameInput').disabled = false;
+    }
+    
     document.getElementById('nicknameModal').classList.add('open');
 }
 
@@ -1429,6 +1447,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('nicknameInput');
     if (input) {
         input.addEventListener('input', () => {
+            if (input.disabled) return;
+            
             clearTimeout(nicknameCheckTimer);
             const nickname = input.value.trim();
             const status = document.getElementById('nicknameStatus');
@@ -1463,12 +1483,21 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function saveNickname() {
+    if (!canChangeNickname) return;
+    
     const nickname = document.getElementById('nicknameInput').value.trim();
     const status = document.getElementById('nicknameStatus');
     
     if (nickname.length < 3 || nickname.length > 15) {
         status.textContent = '❌ Ник должен быть 3-15 символов';
         status.style.color = '#e94560';
+        return;
+    }
+    
+    if (nickname === currentNickname) {
+        status.textContent = '✅ Это твой текущий ник';
+        status.style.color = '#4ecdc4';
+        setTimeout(() => closeNicknameModal(), 800);
         return;
     }
     
@@ -1492,13 +1521,16 @@ async function saveNickname() {
         
         currentNickname = nickname;
         tgUser.name = nickname;
+        canChangeNickname = false;
+        nextChangeAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+        
         localStorage.setItem('pokerDiceNickname', nickname);
         document.getElementById('userName').textContent = nickname;
         
-        status.textContent = '✅ Сохранено!';
+        status.textContent = '✅ Сохранено! Следующая смена через 7 дней';
         status.style.color = '#4ecdc4';
         
-        setTimeout(() => closeNicknameModal(), 800);
+        setTimeout(() => closeNicknameModal(), 1500);
     } catch (e) {
         status.textContent = '❌ Ошибка сети';
         status.style.color = '#e94560';
@@ -1507,19 +1539,6 @@ async function saveNickname() {
 
 // Загружаем ник при старте
 loadNickname();
-
-document.addEventListener('DOMContentLoaded', () => {
-    const codeBadge = document.getElementById('gameRoomCode');
-    if (codeBadge) {
-        codeBadge.addEventListener('click', () => {
-            if (currentRoom) {
-                navigator.clipboard.writeText(currentRoom.code);
-                codeBadge.textContent = '✅';
-                setTimeout(() => codeBadge.textContent = currentRoom.code, 1000);
-            }
-        });
-    }
-});
 
 // ==========================================
 // ===== ПЕРЕЗАХОД В КОМНАТУ =====

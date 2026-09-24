@@ -856,7 +856,38 @@ app.get('/api/nickname/check/:nickname', async (req, res) => {
     }
 });
 
-// Установить ник
+// Получить ник + когда можно менять
+app.get('/api/nickname/get/:telegramId', async (req, res) => {
+    try {
+        const { telegramId } = req.params;
+        const { data } = await supabase
+            .from('nicknames')
+            .select('nickname, updated_at')
+            .eq('telegram_id', telegramId)
+            .single();
+        
+        if (!data) {
+            return res.json({ nickname: null, canChange: true, nextChangeAt: null });
+        }
+        
+        // Проверяем, прошло ли 7 дней
+        const updatedAt = new Date(data.updated_at).getTime();
+        const now = Date.now();
+        const weekMs = 7 * 24 * 60 * 60 * 1000;
+        const canChange = (now - updatedAt) >= weekMs;
+        const nextChangeAt = canChange ? null : updatedAt + weekMs;
+        
+        res.json({ 
+            nickname: data.nickname, 
+            canChange, 
+            nextChangeAt 
+        });
+    } catch (err) {
+        res.json({ nickname: null, canChange: true, nextChangeAt: null });
+    }
+});
+
+// Установить ник (с лимитом раз в неделю)
 app.post('/api/nickname/set', async (req, res) => {
     try {
         const { telegramId, nickname } = req.body;
@@ -865,16 +896,43 @@ app.post('/api/nickname/set', async (req, res) => {
             return res.status(400).json({ error: 'Ник должен быть 3-15 символов' });
         }
         
-        const { data: existing } = await supabase
+        // Проверяем, может ли игрок менять ник
+        const { data: existingNick } = await supabase
+            .from('nicknames')
+            .select('nickname, updated_at')
+            .eq('telegram_id', telegramId)
+            .single();
+        
+        if (existingNick && existingNick.nickname === nickname) {
+            return res.json({ success: true, nickname });
+        }
+        
+        if (existingNick) {
+            const updatedAt = new Date(existingNick.updated_at).getTime();
+            const now = Date.now();
+            const weekMs = 7 * 24 * 60 * 60 * 1000;
+            const remaining = weekMs - (now - updatedAt);
+            
+            if (remaining > 0) {
+                const days = Math.ceil(remaining / (24 * 60 * 60 * 1000));
+                return res.status(400).json({ 
+                    error: `Ник можно менять раз в неделю. Осталось ${days} дн.` 
+                });
+            }
+        }
+        
+        // Проверяем уникальность
+        const { data: busy } = await supabase
             .from('nicknames')
             .select('telegram_id')
             .eq('nickname', nickname)
             .single();
         
-        if (existing && String(existing.telegram_id) !== String(telegramId)) {
+        if (busy && String(busy.telegram_id) !== String(telegramId)) {
             return res.status(400).json({ error: 'Этот ник уже занят' });
         }
         
+        // Обновляем ник в nicknames
         await supabase
             .from('nicknames')
             .upsert({ 
@@ -883,26 +941,24 @@ app.post('/api/nickname/set', async (req, res) => {
                 updated_at: new Date().toISOString() 
             });
         
+        // ОБНОВЛЯЕМ НИК В PLAYERS (чтобы везде сразу поменялось)
+        const { data: playerExists } = await supabase
+            .from('players')
+            .select('id')
+            .eq('id', telegramId)
+            .single();
+        
+        if (playerExists) {
+            await supabase
+                .from('players')
+                .update({ name: nickname })
+                .eq('id', telegramId);
+        }
+        
         res.json({ success: true, nickname });
     } catch (err) {
         console.error('Ошибка установки ника:', err);
         res.status(500).json({ error: 'Ошибка сервера' });
-    }
-});
-
-// Получить ник
-app.get('/api/nickname/get/:telegramId', async (req, res) => {
-    try {
-        const { telegramId } = req.params;
-        const { data } = await supabase
-            .from('nicknames')
-            .select('nickname')
-            .eq('telegram_id', telegramId)
-            .single();
-        
-        res.json({ nickname: data ? data.nickname : null });
-    } catch (err) {
-        res.json({ nickname: null });
     }
 });
 
