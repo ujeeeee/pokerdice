@@ -914,7 +914,7 @@ app.post('/api/nickname/set', async (req, res) => {
             const remaining = weekMs - (now - updatedAt);
             
             if (remaining > 0) {
-                const days = Math.ceil(remaining / (24 * 60 * 60 * 1000));
+                const days = Math.ceil(remaining / (1000));
                 return res.status(400).json({ 
                     error: `Ник можно менять раз в . Осталось ${days} дн.` 
                 });
