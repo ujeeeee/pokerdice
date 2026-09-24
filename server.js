@@ -920,6 +920,7 @@ app.post('/api/nickname/set', async (req, res) => {
                 });
             }
         }
+        //if (!canChangeNickname) return;
         
         // Проверяем уникальность
         const { data: busy } = await supabase
