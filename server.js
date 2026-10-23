@@ -933,6 +933,27 @@ app.post('/api/nickname/set', async (req, res) => {
     }
 });
 
+app.get('/api/health', async (req, res) => {
+    try {
+        // Делаем легкий запрос к Supabase, чтобы база не засыпала
+        const { error } = await supabase
+            .from('players')
+            .select('id')
+            .limit(1);
+
+        if (error) throw error;
+
+        res.status(200).json({ 
+            status: 'ok', 
+            message: 'Сервер и БД активны',
+            timestamp: new Date().toISOString()
+        });
+    } catch (err) {
+        console.error('Ошибка пинга БД:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
 // ==========================================
 // ===== ЗАПУСК =====
 // ==========================================
