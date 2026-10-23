@@ -635,6 +635,7 @@ function showResults(room) {
 }
 
 function closeResultsAndExit() {
+    localStorage.removeItem('pokerDiceRoom'); // очищаем память комнаты
     location.reload();
 }
 
